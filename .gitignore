@@ -36,3 +36,6 @@ TestResults/
 !.claude/agents/
 .claude/agents/*
 !.claude/agents/*.md
+
+# Local run output: logs, failure reports, recorded journals, packaged builds
+artifacts/

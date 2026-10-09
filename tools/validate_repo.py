@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Validate modular spec/task routing, stable IDs, authority and internal navigation."""
 import hashlib
+import itertools
 import json
+import os
 import re
 import sys
 import tomllib
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent.parent
@@ -12,6 +15,12 @@ REQUIRED_FIXTURES={'F-VALLEY','F-RAIN-SNOW','F-TRADE','F-BORDER','F-BATTLE','F-M
 TASK_LINE=r'(?m)^- \[([ xX])\] \*\*(SOV-P\d{2}-T\d{2,3})\*\* — (.+)$'
 MIN_TASKS=1072  # Migrated baseline; IDs are append-only, so the inventory can only grow.
 MARKDOWN_DIRS=['docs','tasks','tests','tools','src','game','meta','.github','.claude','.codex']
+REGISTRY='docs/legal/third-party.json'
+ASSET_EXTENSIONS={'.svg','.png','.jpg','.jpeg','.webp','.bmp','.tga','.exr','.hdr','.dds','.ktx','.ogg','.wav','.mp3','.flac',
+                  '.ttf','.otf','.woff','.woff2','.glb','.gltf','.fbx','.mp4','.webm'}
+ASSET_DIRS=('game','content')
+SKIP_DIRS={'.git','.godot','.mono','bin','obj','node_modules','worktrees','artifacts','__pycache__'}
+NO_ATTRIBUTION={'CC0-1.0','Unlicense','LicenseRef-Project-Original'}  # Every other asset or dataset license needs attribution text.
 
 def load(path): return json.loads((ROOT/path).read_text(encoding='utf-8'))
 
@@ -57,13 +66,37 @@ def fixture_errors(name,data):
     else: errors.append(f'Fixture {fid}: status must be blank or defined')
     return errors
 
+def matrix_names(name,matrix):
+    """Expand ${{ matrix.key }} over literal matrix lists; a name using anything else stays as written."""
+    keys=list(dict.fromkeys(re.findall(r'\$\{\{\s*matrix\.([A-Za-z0-9_-]+)\s*\}\}',name)))
+    if not keys or not all(matrix.get(key) for key in keys): return {name}
+    expanded=set()
+    for values in itertools.product(*(matrix[key] for key in keys)):
+        text=name
+        for key,value in zip(keys,values): text=re.sub(r'\$\{\{\s*matrix\.'+re.escape(key)+r'\s*\}\}',lambda _:value,text)
+        expanded.add(text)
+    return expanded
+
 def workflow_checks(text):
-    """Job ids and job names under a workflow's top-level jobs: map (the check names GitHub reports)."""
-    names,in_jobs=set(),False
-    for line in text.splitlines():
-        if re.match(r'^\S',line): in_jobs=line.rstrip()=='jobs:'
-        elif in_jobs and (match:=re.match(r'^  ([A-Za-z0-9_-]+):\s*$',line)): names.add(match.group(1))
-        elif in_jobs and (match:=re.match(r'^    name:\s*(.+?)\s*$',line)): names.add(match.group(1).strip('\'"'))
+    """Job ids and job names under a workflow's top-level jobs: map (the check names GitHub reports).
+    A name using ${{ matrix.key }} expands over the literal lists under strategy.matrix."""
+    names,in_jobs,in_matrix,key,job_name,matrix=set(),False,False,None,None,{}
+    for line in text.splitlines()+['end:']:  # The sentinel closes the last job.
+        top=re.match(r'^[^\s#]',line)
+        job=in_jobs and re.match(r'^  ([A-Za-z0-9_-]+):\s*$',line)
+        if top or job:
+            if job_name: names|=matrix_names(job_name,matrix)
+            job_name,matrix,in_matrix,key=None,{},False,None
+            if top: in_jobs=line.rstrip()=='jobs:'
+            else: names.add(job.group(1))
+        elif not in_jobs: continue
+        elif match:=re.match(r'^    name:\s*(.+?)\s*$',line): job_name=match.group(1).strip('\'"')
+        elif re.match(r'^      matrix:\s*$',line): in_matrix=True
+        elif in_matrix and (match:=re.match(r'^        ([A-Za-z0-9_-]+):\s*(.*?)\s*$',line)):
+            key=match.group(1)
+            matrix[key]=[item.strip().strip('\'"') for item in match.group(2)[1:-1].split(',')] if match.group(2).startswith('[') else []
+        elif in_matrix and key and (match:=re.match(r'^          - (.+?)\s*$',line)): matrix[key].append(match.group(1).strip('\'"'))
+        elif in_matrix and re.match(r'^ {0,6}\S',line): in_matrix=False
     return names
 
 def ruleset_errors(name,data,checks):
@@ -72,6 +105,123 @@ def ruleset_errors(name,data,checks):
     contexts=[check.get('context') for rule in data['rules'] if isinstance(rule,dict) and rule.get('type')=='required_status_checks'
               for check in rule.get('parameters',{}).get('required_status_checks',[])]
     return [f'Ruleset {name} requires check {context!r}, which no workflow job provides' for context in contexts if context not in checks]
+
+def walk(root,*start):
+    """Files under the start directories (default: all of root), skipping VCS, build output and Godot caches."""
+    for top in start or ['.']:
+        for folder,dirs,files in os.walk(root/top):
+            dirs[:]=sorted(d for d in dirs if d not in SKIP_DIRS)
+            for name in sorted(files): yield Path(folder)/name
+
+def nuget_references(root,errors):
+    """{(lowercase id, version): (id, file)} for central package versions, inline PackageReference versions and versioned MSBuild SDKs."""
+    refs={}
+    def add(name,version): refs[(name.lower(),version)]=(name,where)
+    for path in walk(root):
+        if path.name!='Directory.Packages.props' and path.suffix!='.csproj': continue
+        where=path.relative_to(root).as_posix()
+        try: tree=ET.parse(path).getroot()
+        except ET.ParseError as exc:
+            errors.append(f'{where}: invalid XML ({exc})')
+            continue
+        for item in tree.iter('PackageVersion'): add(item.get('Include',''),item.get('Version'))
+        for item in tree.iter('PackageReference'):
+            if item.get('Version'): add(item.get('Include',''),item.get('Version'))
+        for sdk in (tree.get('Sdk') or '').split(';'):
+            if '/' in sdk: add(*sdk.split('/',1))
+        for item in tree.iter('Sdk'):
+            if item.get('Version'): add(item.get('Name',''),item.get('Version'))
+    return refs
+
+def locked_packages(root,errors):
+    """{(lowercase id, resolved version): (id, lock file)} for every package restored by a project under src/ (project references excluded)."""
+    packages={}
+    for path in walk(root,'src'):
+        if path.name!='packages.lock.json': continue
+        try: data=json.loads(path.read_text(encoding='utf-8'))
+        except json.JSONDecodeError as exc:
+            errors.append(f'{path.relative_to(root).as_posix()}: invalid JSON ({exc})')
+            continue
+        for framework in data.get('dependencies',{}).values():
+            for name,entry in framework.items():
+                if entry.get('type')!='Project': packages[(name.lower(),entry.get('resolved'))]=(name,path.relative_to(root).as_posix())
+    return packages
+
+def registry_entry_errors(section,entry,allowed):
+    """Field, license and notice rules for one registry entry."""
+    if not isinstance(entry,dict): return [f'{REGISTRY} {section}: every entry must be an object']
+    label=f'{REGISTRY} {section}[{entry.get("name") or entry.get("path")}]'
+    required={'dependencies':('name','version','kind','scope','license','source'),'datasets':('name','license','source'),
+              'assets':('path','license','source')}[section]
+    errors=[f'{label}: missing {field}' for field in required if not isinstance(entry.get(field),str) or not entry[field].strip()]
+    license_id=entry.get('license')
+    if isinstance(license_id,str) and license_id not in allowed:
+        errors.append(f'{label}: license {license_id} is not allowed; see docs/legal/README.md (allowed_licenses in the registry)')
+    if section=='dependencies':
+        if entry.get('kind') not in ('nuget','component'): errors.append(f'{label}: kind must be nuget or component')
+        if entry.get('scope') not in ('runtime','build','test'): errors.append(f'{label}: scope must be runtime, build or test')
+        if entry.get('scope')=='runtime' and not entry.get('copyright'): errors.append(f'{label}: runtime items ship in builds and need a copyright notice')
+    elif license_id not in NO_ATTRIBUTION and not entry.get('attribution'):
+        errors.append(f'{label}: license {license_id} requires attribution text')
+    return errors
+
+def legal_errors(root=ROOT):
+    """Every dependency, dataset and audiovisual asset needs a registry entry with an allowed license, and the registry must not go stale."""
+    try: registry=json.loads((root/REGISTRY).read_text(encoding='utf-8'))
+    except (OSError,json.JSONDecodeError) as exc: return [f'{REGISTRY}: {exc}']
+    errors=[]
+    allowed=set(registry.get('allowed_licenses') or [])
+    for section in ('dependencies','datasets','assets'):
+        if not isinstance(registry.get(section),list): errors.append(f'{REGISTRY}: {section} must be a list')
+        else: errors.extend(error for entry in registry[section] for error in registry_entry_errors(section,entry,allowed))
+    if errors: return errors
+    registered={(d['name'].lower(),d['version']):d for d in registry['dependencies'] if d.get('kind')=='nuget'}
+    refs=nuget_references(root,errors)
+    locked=locked_packages(root,errors)
+    for (key,version),(name,where) in sorted({**locked,**refs}.items()):
+        if (key,version) not in registered: errors.append(f'{where}: package {name} {version} has no entry in {REGISTRY}')
+    direct={name for name,_ in refs}
+    for (name,version),entry in sorted(registered.items()):
+        if (name,version) not in refs and (name,version) not in locked and str(entry.get('via','')).lower() not in direct:
+            errors.append(f'{REGISTRY}: {entry["name"]} {version} is no longer referenced by any project; remove the entry or fix its version')
+    toolchain=load_toolchain(root)
+    for entry in registry['dependencies']:
+        if 'toolchain' in entry and toolchain_value(toolchain,entry['toolchain'])!=entry.get('version'):
+            errors.append(f'{REGISTRY}: {entry["name"]} version {entry.get("version")} differs from tools/toolchain.json {entry["toolchain"]}')
+    assets=[a['path'] for a in registry['assets'] if isinstance(a.get('path'),str)]
+    for path in walk(root,*ASSET_DIRS):
+        rel=path.relative_to(root).as_posix()
+        if path.suffix.lower() in ASSET_EXTENSIONS and not any(rel==a or a.endswith('/') and rel.startswith(a) for a in assets):
+            errors.append(f'{rel}: audiovisual asset has no entry in {REGISTRY} assets (add its path, license, source and author)')
+    errors.extend(f'{REGISTRY}: asset {a} does not exist; remove or fix the entry' for a in assets if not (root/a).exists())
+    return errors
+
+def load_toolchain(root=ROOT):
+    try: return json.loads((root/'tools/toolchain.json').read_text(encoding='utf-8'))
+    except (OSError,json.JSONDecodeError): return None
+
+def toolchain_value(toolchain,dotted):
+    for key in dotted.split('.'):
+        toolchain=toolchain.get(key) if isinstance(toolchain,dict) else None
+    return toolchain
+
+def toolchain_errors(root=ROOT):
+    """tools/toolchain.json must agree with global.json and the Godot SDK pin, and its Godot downloads must match the pinned version."""
+    toolchain=load_toolchain(root)
+    if toolchain is None: return ['tools/toolchain.json is missing or not valid JSON']
+    errors=[]
+    try: sdk=json.loads((root/'global.json').read_text(encoding='utf-8'))['sdk']['version']
+    except (OSError,KeyError,json.JSONDecodeError): sdk=None
+    if toolchain_value(toolchain,'dotnet.sdk')!=sdk: errors.append(f'tools/toolchain.json dotnet.sdk must equal global.json sdk.version ({sdk})')
+    version=toolchain_value(toolchain,'godot.version')
+    base=f'https://github.com/godotengine/godot/releases/download/{version}-{toolchain_value(toolchain,"godot.channel")}/'
+    for path in ('godot.editor.linux','godot.editor.macos','godot.editor.windows','godot.templates'):
+        url,sha=(toolchain_value(toolchain,f'{path}.{key}') for key in ('url','sha512'))
+        if not isinstance(url,str) or not url.startswith(base): errors.append(f'tools/toolchain.json {path}.url must start with {base}')
+        if not isinstance(sha,str) or not re.fullmatch(r'[0-9a-f]{128}',sha): errors.append(f'tools/toolchain.json {path}.sha512 must be 128 lowercase hex digits')
+    for (key,sdk_version),(name,where) in nuget_references(root,[]).items():
+        if key=='godot.net.sdk' and sdk_version!=version: errors.append(f'{where}: {name} {sdk_version} differs from tools/toolchain.json godot.version {version}')
+    return errors
 
 def spec_version(chapter38):
     """Newest x.y.z entry in the §38.4 living-version record."""
@@ -146,10 +296,13 @@ def check():
     for path in sorted((ROOT/'.github/rulesets').glob('*.json')):
         try: errors.extend(ruleset_errors(path.name,json.loads(path.read_text(encoding='utf-8')),checks))
         except json.JSONDecodeError as exc: check_ok(False,f'Invalid JSON {path.relative_to(ROOT)}: {exc}')
+    errors.extend(toolchain_errors())
+    errors.extend(legal_errors())
     for item in ['AGENTS.md','CLAUDE.md','README.md','docs/agents/QUALITY_BAR.md','docs/agents/WORKFLOW.md',
                  'docs/agents/MODEL_ROUTING.md','docs/agents/DEFINITION_OF_DONE.md','docs/architecture/ADR-0001-runtime.md',
                  'docs/architecture/ADR-0003-platforms-input-distribution.md','docs/architecture/ADR-0004-units-coordinates-time-identifiers.md',
-                 '.github/workflows/repo-docs.yml','.codex/config.toml',
+                 '.github/workflows/repo-docs.yml','.github/workflows/build.yml','.codex/config.toml',
+                 'tools/toolchain.json','tools/doctor.py','docs/legal/README.md',
                  '.claude/agents/repo-scout.md','.claude/agents/repo-implementer.md',
                  '.claude/agents/repo-reviewer.md']:
         check_ok((ROOT/item).exists(),f'Missing foundation artifact {item}')
@@ -188,7 +341,7 @@ def check():
         print('FAILED:')
         for error in errors: print(' - '+error)
         return False
-    print(f'PASS: {len(index)} authoritative design chapters, {len(phases)} phases, {len(discovered)} unique tasks, {len(fixtures)} fixture manifests; exit gates, hashes, routing, ID order, evidence, rulesets, agent adapters and relative Markdown links valid.')
+    print(f'PASS: {len(index)} authoritative design chapters, {len(phases)} phases, {len(discovered)} unique tasks, {len(fixtures)} fixture manifests; exit gates, hashes, routing, ID order, evidence, rulesets, toolchain pins, license registry, agent adapters and relative Markdown links valid.')
     print('Scope: repository documentation validation; not Godot/.NET game execution or remote CI enforcement.')
     return True
 

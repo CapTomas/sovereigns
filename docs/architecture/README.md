@@ -4,6 +4,7 @@
 - [ADR-0002 — Document and task authority](ADR-0002-documentation-and-task-authority.md)
 - [ADR-0003 — Supported platforms, input and distribution constraints](ADR-0003-platforms-input-distribution.md)
 - [ADR-0004 — World units, coordinates, precision, time and identifiers](ADR-0004-units-coordinates-time-identifiers.md)
+- [ADR-0005 — Toolchain pins, repository layout and build policy](ADR-0005-toolchain-and-repository-layout.md)
 - [System map, authoritative owners and contracts](SYSTEM_MAP.md)
 
 Use an ADR for consequential decisions about ownership, persistence, public boundaries, runtime choices or expensive-to-reverse tradeoffs. Routine fixes and local implementation choices need no ADR. Follow [change control](../agents/CHANGE_CONTROL.md); gameplay rules remain in `docs/spec/`.

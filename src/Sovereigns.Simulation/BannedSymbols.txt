@@ -1,0 +1,12 @@
+P:System.DateTime.Now;Simulation must not read wall-clock time (ADR-0004 §3); use the world's SimTime
+P:System.DateTime.UtcNow;Simulation must not read wall-clock time (ADR-0004 §3); use the world's SimTime
+P:System.DateTime.Today;Simulation must not read wall-clock time (ADR-0004 §3); use the world's SimTime
+P:System.DateTimeOffset.Now;Simulation must not read wall-clock time (ADR-0004 §3); use the world's SimTime
+P:System.DateTimeOffset.UtcNow;Simulation must not read wall-clock time (ADR-0004 §3); use the world's SimTime
+P:System.TimeProvider.System;Simulation must not read wall-clock time (ADR-0004 §3); hosts inject a TimeProvider for diagnostics only
+P:System.Environment.TickCount;Simulation must not read wall-clock time (ADR-0004 §3)
+P:System.Environment.TickCount64;Simulation must not read wall-clock time (ADR-0004 §3)
+T:System.Diagnostics.Stopwatch;Simulation must not read wall-clock time (ADR-0004 §3); hosts measure step cost
+T:System.Random;Use the world's seeded random streams (SOV-P02-T06), never System.Random
+M:System.Guid.NewGuid;GUIDs are not deterministic (ADR-0004 §5); allocate per-kind entity IDs
+M:System.String.GetHashCode;String hash codes are randomized per process; never use them to decide outcomes
