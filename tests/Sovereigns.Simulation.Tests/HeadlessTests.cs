@@ -100,6 +100,23 @@ public sealed class HeadlessTests
         Assert.Contains("replay MISMATCH", replay.Out, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void FailedStepThatNoLongerFailsIsReportedAsNotReproduced()
+    {
+        var directory = TestSupport.NewTempDirectory();
+        Run("run", "--fixture", "F-EMPTY", "--fail-at-ms", "2000", "--reports", directory);
+        var report = Assert.Single(Directory.GetFiles(directory, "failure-*.json"));
+        // Claim the step at 2000 ms failed with one pending command; replaying it completes normally.
+        File.WriteAllText(report, File.ReadAllText(report)
+            .Replace("\"failed_in_step\": false", "\"failed_in_step\": true", StringComparison.Ordinal)
+            .Replace("\"pending_commands\": []", "\"pending_commands\": [{\"type\": \"remove_marker\", \"marker\": 1}]", StringComparison.Ordinal));
+
+        var replay = Run("replay", report);
+
+        Assert.Equal(HeadlessApp.Mismatch, replay.Code);
+        Assert.Contains("failure NOT reproduced", replay.Out, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(new[] { "run" }, "give --fixture")]
     [InlineData(new[] { "run", "--fixture", "F-VALLEY" }, "is blank")]

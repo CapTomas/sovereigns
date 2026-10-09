@@ -75,7 +75,7 @@ godot --headless --path game --import
 godot --headless --path game --build-solutions --quit
 python3 tools/ci/run_checked.py --log artifacts/logs/client-tests.log -- godot --headless --path game res://tests/ClientTests.tscn
 python3 tools/ci/run_checked.py --log artifacts/logs/shell-smoke.log \
-  --require "world created" --require "shutdown" \
+  --require "world created" --require "ms: shutdown {" \
   --forbid "leaked at exit" --forbid "ObjectDB instances leaked" --forbid "still in use at exit" --forbid "ERROR:" \
   -- godot --headless --verbose --path game --quit-after 300 -- --fixture F-EMPTY
 ```
@@ -92,7 +92,7 @@ python3 tools/ci/run_checked.py --log artifacts/logs/export.log \
   -- godot --headless --path game --export-release "Linux" "$PWD/artifacts/package/linux/sovereigns.x86_64"
 cp -R content artifacts/package/linux/content
 python3 tools/ci/write_notices.py artifacts/package/linux/THIRD-PARTY-NOTICES.txt
-python3 tools/ci/run_checked.py --log artifacts/logs/package-smoke.log --require "world created" --require "shutdown" --forbid "ERROR:" \
+python3 tools/ci/run_checked.py --log artifacts/logs/package-smoke.log --require "world created" --require "ms: shutdown {" --forbid "ERROR:" \
   -- artifacts/package/linux/sovereigns.x86_64 --headless --quit-after 120 -- --scenario core:scenario/empty_world --seed 20261009
 ```
 

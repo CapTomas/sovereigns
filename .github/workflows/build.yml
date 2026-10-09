@@ -119,7 +119,7 @@ jobs:
         timeout-minutes: 5
         run: >-
           python3 tools/ci/run_checked.py --log artifacts/logs/shell-smoke.log --timeout 120
-          --require "world created" --require "shutdown"
+          --require "world created" --require "ms: shutdown {"
           --forbid "leaked at exit" --forbid "ObjectDB instances leaked" --forbid "still in use at exit" --forbid "ERROR:"
           -- godot --headless --verbose --path game --quit-after 300 -- --fixture F-EMPTY
       - name: Upload logs and failure reports
@@ -175,7 +175,7 @@ jobs:
         timeout-minutes: 5
         run: >-
           python3 tools/ci/run_checked.py --log artifacts/logs/package-smoke.log --timeout 120
-          --require "world created" --require "shutdown" --forbid "ERROR:"
+          --require "world created" --require "ms: shutdown {" --forbid "ERROR:"
           -- artifacts/package/linux/sovereigns.x86_64 --headless --quit-after 120 -- --scenario core:scenario/empty_world --seed 20261009
       - name: Upload package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

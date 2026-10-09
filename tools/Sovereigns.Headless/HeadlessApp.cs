@@ -238,9 +238,11 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         {
             world = Replay.Run(scenario, report.Seed, report.Commands, new SimTime(report.SimTimeMs));
         }
-        catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
+#pragma warning disable CA1031 // Any failure while rebuilding a reported world means the report no longer reproduces.
+        catch (Exception ex)
+#pragma warning restore CA1031
         {
-            stdout.WriteLine($"replay MISMATCH: {ex.Message}");
+            stdout.WriteLine($"replay MISMATCH: {ex.GetType().Name}: {ex.Message}");
             return Mismatch;
         }
 
@@ -279,6 +281,13 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         catch (Exception ex)
 #pragma warning restore CA1031
         {
+            // Exception.ToString() starts with the full type name, so a different failure is not mistaken for the reported one.
+            if (report.Exception is { } recorded && !recorded.StartsWith(ex.GetType().FullName + ":", StringComparison.Ordinal))
+            {
+                stdout.WriteLine($"failure MISMATCH in the step at {report.SimTimeMs} ms: reported {recorded.Split('\n')[0]}, replay threw {ex.GetType().FullName}: {ex.Message}");
+                return Mismatch;
+            }
+
             stdout.WriteLine($"failure reproduced in the step at {report.SimTimeMs} ms with {report.PendingCommands.Count} pending command(s): {ex.GetType().Name}: {ex.Message}");
             return Ok;
         }

@@ -17,7 +17,7 @@ Policy documents do not enforce themselves. Phase 00 is not Verified until the i
 
 ## Enforcement to apply once public
 
-1. **Protect `main`** with [`.github/rulesets/protect-main.json`](../../.github/rulesets/protect-main.json): PR required, required status check `docs` from GitHub Actions and up to date with `main`, resolved conversations, no force push, no deletion, no bypass actors.
+1. **Protect `main`** with [`.github/rulesets/protect-main.json`](../../.github/rulesets/protect-main.json): PR required, required status checks from GitHub Actions (`docs`; since Phase 01 also `simulation (ubuntu-24.04)`, `simulation (windows-2025)`, `simulation (macos-15)`, `determinism`, `client` and `package`) and up to date with `main`, resolved conversations, no force push, no deletion, no bypass actors.
    `gh api --method POST repos/CapTomas/sovereigns/rulesets --input .github/rulesets/protect-main.json`
 2. **Actions hardening:** in Settings → Actions → General, allow only GitHub-owned actions and require SHA-pinned actions. Set default workflow permissions to read-only, stop workflows from approving PRs, and require approval for workflows from outside contributors' fork PRs. The workflow pins actions by commit SHA and requests `contents: read`.
 3. **Security:** enable secret scanning and push protection (free for public repositories).
@@ -33,5 +33,5 @@ Policy documents do not enforce themselves. Phase 00 is not Verified until the i
 
 ## Later phases
 
-- Phase 01: add the .NET build/test and headless Godot checks to the workflow, and add their check names to the ruleset. A docs-only workflow is insufficient for a code project.
+- Phase 01 (done): `.github/workflows/build.yml` adds the .NET build and test, cross-OS determinism, headless Godot and packaging checks, and the ruleset requires them. Evidence is in `tasks/evidence/P01.md`. Re-apply the ruleset after renaming or adding a required job: `gh api --method PUT repos/CapTomas/sovereigns/rulesets/<id> --input .github/rulesets/protect-main.json`.
 - Review platform and licensing constraints before accepting any dependency (SOV-P01-T14).
