@@ -1,0 +1,24 @@
+# Python validation tooling
+__pycache__/
+*.py[cod]
+.venv/
+
+# .NET artifacts (Phase 01+)
+**/bin/
+**/obj/
+*.user
+*.suo
+
+# Godot generated artifacts (Phase 01+)
+.godot/
+.mono/
+
+# IDE/OS
+.DS_Store
+.vscode/
+.idea/
+
+# Generated test/output data
+coverage/
+TestResults/
+*.tmp

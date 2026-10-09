@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "purpose": "Minimal visual specification routing. Paths relative to docs/visual.",
+  "always": ["AGENTS.md", "SOVEREIGNS_VISUAL_DIRECTION.md"],
+  "topics": {
+    "identity": ["08-COLOR-TYPOGRAPHY-AND-TEXTURE.md"],
+    "terrain": ["01-TERRAIN-AND-NATURE.md", "07-CAMERA-ZOOM-AND-LOD.md"],
+    "rivers": ["01-TERRAIN-AND-NATURE.md", "05-WEATHER-SEASONS-AND-LIGHT.md"],
+    "campaign": ["02-CAMPAIGN-MAP.md", "06-UI-AND-CARTOGRAPHY.md"],
+    "battlefield": ["03-TACTICAL-BATTLEFIELD.md", "01-TERRAIN-AND-NATURE.md"],
+    "soldiers": ["09-ARMIES-AND-ANIMATION.md", "03-TACTICAL-BATTLEFIELD.md"],
+    "structures": ["04-SETTLEMENTS-AND-FORTIFICATIONS.md", "01-TERRAIN-AND-NATURE.md"],
+    "weather": ["05-WEATHER-SEASONS-AND-LIGHT.md", "10-EFFECTS-AND-FEEDBACK.md"],
+    "ui": ["06-UI-AND-CARTOGRAPHY.md", "08-COLOR-TYPOGRAPHY-AND-TEXTURE.md"],
+    "camera": ["07-CAMERA-ZOOM-AND-LOD.md", "11-PERFORMANCE-AND-RENDERING.md"],
+    "color": ["08-COLOR-TYPOGRAPHY-AND-TEXTURE.md", "tokens/palette.json"],
+    "effects": ["10-EFFECTS-AND-FEEDBACK.md", "05-WEATHER-SEASONS-AND-LIGHT.md"],
+    "performance": ["11-PERFORMANCE-AND-RENDERING.md", "07-CAMERA-ZOOM-AND-LOD.md"],
+    "assets": ["12-ASSET-PIPELINE-AND-GOVERNANCE.md", "reference/ASSET_DELIVERY_TEMPLATE.md"],
+    "qa": ["13-LOOKDEV-AND-VISUAL-QA.md", "reference/SCENE_BRIEFS.md"],
+    "lookdev": ["13-LOOKDEV-AND-VISUAL-QA.md", "reference/SCENE_BRIEFS.md", "08-COLOR-TYPOGRAPHY-AND-TEXTURE.md"]
+  }
+}

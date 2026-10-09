@@ -1,0 +1,236 @@
+{
+  "0": {
+    "title": "How to use and maintain this bible",
+    "path": "docs/spec/00-how-to-use-and-maintain-this-bible.md",
+    "sha256": "aeabc32346b9f31421ba02d99b4a5ce293dd05b28747b8f39232ccc2c1c49a2f",
+    "bytes": 4948
+  },
+  "1": {
+    "title": "Product identity and creative direction",
+    "path": "docs/spec/01-product-identity-and-creative-direction.md",
+    "sha256": "2d601df39413765c52d507e6294c3829ab51fd88af5fe14960ffcfc24e10561d",
+    "bytes": 5846
+  },
+  "2": {
+    "title": "Campaign structure, player role and victory",
+    "path": "docs/spec/02-campaign-structure-player-role-and-victory.md",
+    "sha256": "75ee01463421f9c9d7ba926490d8b3c810fa57b156d1d3ede07613d493814867",
+    "bytes": 6050
+  },
+  "3": {
+    "title": "Physical world foundation: authoritative spatial data and causal simulation",
+    "path": "docs/spec/03-physical-world-foundation-authoritative-spatial-data-and-causal-simu.md",
+    "sha256": "062ceffc5c8d0e69da5d7afbdee75a58a97d08b0f680ea216c48f6b4ab0f8497",
+    "bytes": 23808
+  },
+  "4": {
+    "title": "World Genesis: generating credible geography, water, climate and history",
+    "path": "docs/spec/04-world-genesis-generating-credible-geography-water-climate-and-histor.md",
+    "sha256": "03684d97a7147f543cae47a9a6497fb54bedc85ac557b57282cdf1bc86079fbb",
+    "bytes": 13342
+  },
+  "5": {
+    "title": "Active world physics: sun, seasons, atmosphere, weather and the water cycle",
+    "path": "docs/spec/05-active-world-physics-sun-seasons-atmosphere-weather-and-the-water-cy.md",
+    "sha256": "5df2cf3b1d458d2cb55f7bc348d04b859b46c900c3be0088d290f18bc82261de",
+    "bytes": 22354
+  },
+  "6": {
+    "title": "Ecosystems, soils, resources and living landscape change",
+    "path": "docs/spec/06-ecosystems-soils-resources-and-living-landscape-change.md",
+    "sha256": "1fc7a846d77d31d6adfa759b2c691bc623c1aec0e7e21f48610c5d88126c779e",
+    "bytes": 9647
+  },
+  "7": {
+    "title": "Generated peoples, cultures, religions and history",
+    "path": "docs/spec/07-generated-peoples-cultures-religions-and-history.md",
+    "sha256": "7e7c0cc507b3e4c6007fc965eba89fcb11ac869599f534e68c102a68e77355ff",
+    "bytes": 4655
+  },
+  "8": {
+    "title": "Population and society",
+    "path": "docs/spec/08-population-and-society.md",
+    "sha256": "872db658e3a4323ad526ba49fdc14a45c11e571e957c62da09025fd222137d57",
+    "bytes": 3690
+  },
+  "9": {
+    "title": "Land rights, nobles, institutions and decentralized government",
+    "path": "docs/spec/09-land-rights-nobles-institutions-and-decentralized-government.md",
+    "sha256": "01ce763c583e0de65252d0374d0c79e6d8086403cb641082a07d2fdf5f5ad890",
+    "bytes": 5449
+  },
+  "10": {
+    "title": "Settlements, regional development and spatial economy",
+    "path": "docs/spec/10-settlements-regional-development-and-spatial-economy.md",
+    "sha256": "c62137112229aaf0d873429bbdf307f3573c03058718c6206fce3c9277809d13",
+    "bytes": 4394
+  },
+  "11": {
+    "title": "Agriculture, livestock and food security",
+    "path": "docs/spec/11-agriculture-livestock-and-food-security.md",
+    "sha256": "c5410ad3f6f064c397bb5d3301c4dab1d95101f7ee39a5c48efddab46bd3f028",
+    "bytes": 4485
+  },
+  "12": {
+    "title": "Natural resources, manufacturing and technology of production",
+    "path": "docs/spec/12-natural-resources-manufacturing-and-technology-of-production.md",
+    "sha256": "177d4b8f232b88096fc7a22af138c3aaf0bc429bc27c3e5975720343f38b4e47",
+    "bytes": 3430
+  },
+  "13": {
+    "title": "Markets, transport and merchant trade",
+    "path": "docs/spec/13-markets-transport-and-merchant-trade.md",
+    "sha256": "1fcf32ae0089ebc54c0c9d44f5a524a43feb914f386533dabfb28e3cbfd15df7",
+    "bytes": 5602
+  },
+  "14": {
+    "title": "Money, taxation, credit and the royal treasury",
+    "path": "docs/spec/14-money-taxation-credit-and-the-royal-treasury.md",
+    "sha256": "42ac2aade7fdedaf79b4154b29d18b65c32fed456e7f6fc324f7920d49f8c183",
+    "bytes": 4401
+  },
+  "15": {
+    "title": "Construction, infrastructure and strategic geography",
+    "path": "docs/spec/15-construction-infrastructure-and-strategic-geography.md",
+    "sha256": "ac82c7ccb686a233e981ea2095929e758356ee086d898e3849d4efd85a1b2bca",
+    "bytes": 5488
+  },
+  "16": {
+    "title": "Government policy, administration and domestic politics",
+    "path": "docs/spec/16-government-policy-administration-and-domestic-politics.md",
+    "sha256": "103f11b2cb1456b32816193c722e906dd736fc18067bc43ee0106f1ff6c30aa1",
+    "bytes": 2605
+  },
+  "17": {
+    "title": "Diplomacy, intelligence and strategic politics",
+    "path": "docs/spec/17-diplomacy-intelligence-and-strategic-politics.md",
+    "sha256": "168b08bf0ecad7cb4f37e1021f7f8edad92ea2e83eb58e4a34d9437ee4589faa",
+    "bytes": 3844
+  },
+  "18": {
+    "title": "Knowledge, military traditions and social change",
+    "path": "docs/spec/18-knowledge-military-traditions-and-social-change.md",
+    "sha256": "952034e06f4466969007d7fae29043470bcddfaa03ff9d612455ce554f11799f",
+    "bytes": 1729
+  },
+  "19": {
+    "title": "Armies: recruitment, organization and supply",
+    "path": "docs/spec/19-armies-recruitment-organization-and-supply.md",
+    "sha256": "ef9913b56df8633bca350f801423751eab967c410ed70ad4608d379610a1adce",
+    "bytes": 6486
+  },
+  "20": {
+    "title": "Operational campaign warfare, movement and encounters",
+    "path": "docs/spec/20-operational-campaign-warfare-movement-and-encounters.md",
+    "sha256": "8b2c90ef9c35770c1210dbe57a6ed019b4793cebcbf5ccce97a734e121e3bd01",
+    "bytes": 7261
+  },
+  "21": {
+    "title": "Territorial sovereignty, military control, passage and encirclement",
+    "path": "docs/spec/21-territorial-sovereignty-military-control-passage-and-encirclement.md",
+    "sha256": "2469c921da3b5ede93320d1fa776c4c06d2440ad4356eba7bc47785c9f3af1bc",
+    "bytes": 18318
+  },
+  "22": {
+    "title": "Tactical battles: shared terrain and massive regiment control",
+    "path": "docs/spec/22-tactical-battles-shared-terrain-and-massive-regiment-control.md",
+    "sha256": "57ded526c4a21e580ca2a4569c867ebe776f4193020ea3f5b0601a690a55470a",
+    "bytes": 10948
+  },
+  "23": {
+    "title": "Sieges, fortified battles and maritime operations",
+    "path": "docs/spec/23-sieges-fortified-battles-and-maritime-operations.md",
+    "sha256": "4c1c1d62d17155c0b3bf12d54ba6ad2f2d9cd3d44f73b2914e07a0c09554ea40",
+    "bytes": 4629
+  },
+  "24": {
+    "title": "Resolution, aftermath, occupation and persistent consequence",
+    "path": "docs/spec/24-resolution-aftermath-occupation-and-persistent-consequence.md",
+    "sha256": "af8f830929656e3f4e73bb273c663bd1f12414028727607f74ff75f47ea7c774",
+    "bytes": 3328
+  },
+  "25": {
+    "title": "AI: autonomous economy, rival kingdoms and battlefield command",
+    "path": "docs/spec/25-ai-autonomous-economy-rival-kingdoms-and-battlefield-command.md",
+    "sha256": "4395dab863e4225cf34f8701d29f65b025709f67e5df77e5548b01e633d45bb1",
+    "bytes": 5351
+  },
+  "26": {
+    "title": "UX, information design and player interaction",
+    "path": "docs/spec/26-ux-information-design-and-player-interaction.md",
+    "sha256": "4d637479cdd339c3d9bdeb5749b20714664896de8104456b79d4b91f0a75cda4",
+    "bytes": 8543
+  },
+  "27": {
+    "title": "Presentation requirements and visual design boundary",
+    "path": "docs/spec/27-presentation-requirements-and-visual-design-boundary.md",
+    "sha256": "f2f9473951f379a6bb1e6b4158fe0eb05ea88471a8d56622a65dac624ca8b296",
+    "bytes": 2339
+  },
+  "28": {
+    "title": "Core game settings, pacing and quality-of-life rules",
+    "path": "docs/spec/28-core-game-settings-pacing-and-quality-of-life-rules.md",
+    "sha256": "47257f774d8eb2b67b2c51b6f91d0a2af9b62ba011fb2a8c868c79ce826c80d3",
+    "bytes": 2527
+  },
+  "29": {
+    "title": "Simulation scheduling, determinism and performance",
+    "path": "docs/spec/29-simulation-scheduling-determinism-and-performance.md",
+    "sha256": "f48d587975bfe98d15eb0a8f2a5b3ea08dc864081c2a1083825f4b7000771c47",
+    "bytes": 7915
+  },
+  "30": {
+    "title": "Cross-system contracts and edge-case rulings",
+    "path": "docs/spec/30-cross-system-contracts-and-edge-case-rulings.md",
+    "sha256": "671a6a3f3f81c51d1661dd97822fbdc2ffbd7d2d9dd40f5332f721761cef3dc9",
+    "bytes": 14291
+  },
+  "31": {
+    "title": "Worked campaigns and cross-system narratives",
+    "path": "docs/spec/31-worked-campaigns-and-cross-system-narratives.md",
+    "sha256": "c7a06b8e0b5f685d34ce484e1b67b3550b1eb39daeef1cc1d8595a04d6d9d435",
+    "bytes": 11853
+  },
+  "32": {
+    "title": "Validation: design invariants and acceptance scenarios",
+    "path": "docs/spec/32-validation-design-invariants-and-acceptance-scenarios.md",
+    "sha256": "e6e1fcb5349d9ca724c483f5faff716e6287bb49ae49c9f8282ea97955419226",
+    "bytes": 16148
+  },
+  "33": {
+    "title": "Agent implementation charter and delivery order",
+    "path": "docs/spec/33-agent-implementation-charter-and-delivery-order.md",
+    "sha256": "9f9b573250d0e297feef1b92716292aaaf3accf0ed7d8cecc2af26716e82db87",
+    "bytes": 9032
+  },
+  "34": {
+    "title": "Canonical decisions register",
+    "path": "docs/spec/34-canonical-decisions-register.md",
+    "sha256": "a9f254ce3d7fae148b1cc40a95dfdac22047b19ffbfc17c38dc66cceb1c5d3dd",
+    "bytes": 6790
+  },
+  "35": {
+    "title": "Glossary: consistent terminology across agents",
+    "path": "docs/spec/35-glossary-consistent-terminology-across-agents.md",
+    "sha256": "cadbb0584a2b709c00236de30f7e2a81dbe6f47c2c7e59eaf34129ace5d4f079",
+    "bytes": 8075
+  },
+  "36": {
+    "title": "Fast answers to frequent design-agent questions",
+    "path": "docs/spec/36-fast-answers-to-frequent-design-agent-questions.md",
+    "sha256": "9a5a1d741490897635f132f5b77c3675df368e11cc70b1070d2d5b328ed47487",
+    "bytes": 9315
+  },
+  "37": {
+    "title": "Open-ended balance, without open design holes",
+    "path": "docs/spec/37-open-ended-balance-without-open-design-holes.md",
+    "sha256": "81c696b7274d62137d6854fc23b52ebe6a69d9a8bdcf69f52063d7ce96f00117",
+    "bytes": 1441
+  },
+  "38": {
+    "title": "Document continuity and future decision governance",
+    "path": "docs/spec/38-document-continuity-and-future-decision-governance.md",
+    "sha256": "53eb6ce0b64bb75ec1a9c3004abe99153a6a9b629453f269d5a8f6625fb32ee0",
+    "bytes": 3108
+  }
+}

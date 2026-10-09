@@ -1,0 +1,23 @@
+name: Validate agentic repository foundation
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: repo-docs-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Validate content and agent routing
+        run: python3 tools/validate_repo.py
+      - name: Run focused routing tests
+        run: python3 -m unittest discover -s tools/tests -v
+      - name: Show initial context route
+        run: python3 tools/task_context.py SOV-P00-T01 --list

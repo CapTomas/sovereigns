@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "title": "Sovereigns visual baseline palette",
+  "status": "adopted-lookdev-baseline-requires-contrast-validation",
+  "description": "Named presentation colors, not world-simulation biome constants; final in-scene visual acceptance required.",
+  "colors": {
+    "ui.canvas": "#F2F0E9",
+    "ui.surface": "#FCFBF6",
+    "ui.surfaceAlt": "#E8E7DF",
+    "ui.ink": "#252D30",
+    "ui.inkMuted": "#536267",
+    "ui.divider": "#C8CBC4",
+    "ui.focus": "#315D78",
+    "ui.selection": "#2D719A",
+    "ui.warning": "#93631D",
+    "ui.danger": "#923F3E",
+    "ui.positive": "#346D54",
+    "map.grassMid": "#788A66",
+    "map.forestDeep": "#3E6252",
+    "map.forestMixed": "#5B7959",
+    "map.highland": "#858B78",
+    "map.bareRock": "#92918A",
+    "map.alluvialSoil": "#917B61",
+    "map.drySoil": "#B19A73",
+    "map.wetSoil": "#615F50",
+    "map.sand": "#C5B185",
+    "map.snow": "#DDE4E5",
+    "map.riverDeep": "#406F7C",
+    "map.riverShallow": "#7A9BA0",
+    "map.road": "#86755B"
+  },
+  "usage_rules": [
+    "Semantic UI tokens are preferred to one-off hex codes.",
+    "Map colors are initial art direction samples; physically grounded rendering may deviate by light, season, wetness and vegetation.",
+    "Faction palettes are generated from a constrained distinctness scheme and must use non-color markers.",
+    "All final UI pairings and overlays require actual rendered contrast and accessibility testing.",
+    "Do not infer material passability or hazard from color alone."
+  ]
+}

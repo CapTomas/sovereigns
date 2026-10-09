@@ -1,0 +1,17 @@
+{
+  "purpose": "Content-preservation manifest for the migration to modular documents",
+  "input_bible": {
+    "source_filename": "SOVEREIGNS_GAME_DESIGN_BIBLE.md",
+    "sha256": "0fb9dfba0716859325b1f1758419d788e2af0c478e8420be0d9ee2dc549eebda",
+    "source_numbered_chapters": 39,
+    "notes": "Full numbered chapter content preserved verbatim; original title/header and old monolithic TOC replaced by modern modular index."
+  },
+  "input_roadmap": {
+    "source_filename": "SOVEREIGNS_DEVELOPMENT_ROADMAP.md",
+    "sha256": "f9c34219fadf8a62176e08a9c044bc2bb7dc6d23217f88e2454abaca0b98aa3e",
+    "source_phases": 55,
+    "source_task_count": 1058,
+    "notes": "Existing numbered phase bodies copied and preserved except stronger Phase 00 gate plus appended P00 tasks; original A/C materials retained under docs/process."
+  },
+  "new_phase_00_tasks": 14
+}

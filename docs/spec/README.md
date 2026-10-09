@@ -1,0 +1,47 @@
+# Gameplay and simulation specifications
+
+Each numbered chapter is a **normative source** for the behavior it describes. The files below contain the original design rules, split without summarizing or dropping mechanics. Do **not** read all chapters for each task.
+
+Use `python3 tools/task_context.py SOV-Pxx-Tyy` to discover the chapters required for the active task. Read the indicated sections plus explicit upstream/downstream consumers when the change affects them. Do not treat fast-answer indexes or agent briefings as replacements for normative chapters.
+
+- [00. How to use and maintain this bible](../../docs/spec/00-how-to-use-and-maintain-this-bible.md)
+- [01. Product identity and creative direction](../../docs/spec/01-product-identity-and-creative-direction.md)
+- [02. Campaign structure, player role and victory](../../docs/spec/02-campaign-structure-player-role-and-victory.md)
+- [03. Physical world foundation: authoritative spatial data and causal simulation](../../docs/spec/03-physical-world-foundation-authoritative-spatial-data-and-causal-simu.md)
+- [04. World Genesis: generating credible geography, water, climate and history](../../docs/spec/04-world-genesis-generating-credible-geography-water-climate-and-histor.md)
+- [05. Active world physics: sun, seasons, atmosphere, weather and the water cycle](../../docs/spec/05-active-world-physics-sun-seasons-atmosphere-weather-and-the-water-cy.md)
+- [06. Ecosystems, soils, resources and living landscape change](../../docs/spec/06-ecosystems-soils-resources-and-living-landscape-change.md)
+- [07. Generated peoples, cultures, religions and history](../../docs/spec/07-generated-peoples-cultures-religions-and-history.md)
+- [08. Population and society](../../docs/spec/08-population-and-society.md)
+- [09. Land rights, nobles, institutions and decentralized government](../../docs/spec/09-land-rights-nobles-institutions-and-decentralized-government.md)
+- [10. Settlements, regional development and spatial economy](../../docs/spec/10-settlements-regional-development-and-spatial-economy.md)
+- [11. Agriculture, livestock and food security](../../docs/spec/11-agriculture-livestock-and-food-security.md)
+- [12. Natural resources, manufacturing and technology of production](../../docs/spec/12-natural-resources-manufacturing-and-technology-of-production.md)
+- [13. Markets, transport and merchant trade](../../docs/spec/13-markets-transport-and-merchant-trade.md)
+- [14. Money, taxation, credit and the royal treasury](../../docs/spec/14-money-taxation-credit-and-the-royal-treasury.md)
+- [15. Construction, infrastructure and strategic geography](../../docs/spec/15-construction-infrastructure-and-strategic-geography.md)
+- [16. Government policy, administration and domestic politics](../../docs/spec/16-government-policy-administration-and-domestic-politics.md)
+- [17. Diplomacy, intelligence and strategic politics](../../docs/spec/17-diplomacy-intelligence-and-strategic-politics.md)
+- [18. Knowledge, military traditions and social change](../../docs/spec/18-knowledge-military-traditions-and-social-change.md)
+- [19. Armies: recruitment, organization and supply](../../docs/spec/19-armies-recruitment-organization-and-supply.md)
+- [20. Operational campaign warfare, movement and encounters](../../docs/spec/20-operational-campaign-warfare-movement-and-encounters.md)
+- [21. Territorial sovereignty, military control, passage and encirclement](../../docs/spec/21-territorial-sovereignty-military-control-passage-and-encirclement.md)
+- [22. Tactical battles: shared terrain and massive regiment control](../../docs/spec/22-tactical-battles-shared-terrain-and-massive-regiment-control.md)
+- [23. Sieges, fortified battles and maritime operations](../../docs/spec/23-sieges-fortified-battles-and-maritime-operations.md)
+- [24. Resolution, aftermath, occupation and persistent consequence](../../docs/spec/24-resolution-aftermath-occupation-and-persistent-consequence.md)
+- [25. AI: autonomous economy, rival kingdoms and battlefield command](../../docs/spec/25-ai-autonomous-economy-rival-kingdoms-and-battlefield-command.md)
+- [26. UX, information design and player interaction](../../docs/spec/26-ux-information-design-and-player-interaction.md)
+- [27. Presentation requirements and visual design boundary](../../docs/spec/27-presentation-requirements-and-visual-design-boundary.md)
+- [28. Core game settings, pacing and quality-of-life rules](../../docs/spec/28-core-game-settings-pacing-and-quality-of-life-rules.md)
+- [29. Simulation scheduling, determinism and performance](../../docs/spec/29-simulation-scheduling-determinism-and-performance.md)
+- [30. Cross-system contracts and edge-case rulings](../../docs/spec/30-cross-system-contracts-and-edge-case-rulings.md)
+- [31. Worked campaigns and cross-system narratives](../../docs/spec/31-worked-campaigns-and-cross-system-narratives.md)
+- [32. Validation: design invariants and acceptance scenarios](../../docs/spec/32-validation-design-invariants-and-acceptance-scenarios.md)
+- [33. Agent implementation charter and delivery order](../../docs/spec/33-agent-implementation-charter-and-delivery-order.md)
+- [34. Canonical decisions register](../../docs/spec/34-canonical-decisions-register.md)
+- [35. Glossary: consistent terminology across agents](../../docs/spec/35-glossary-consistent-terminology-across-agents.md)
+- [36. Fast answers to frequent design-agent questions](../../docs/spec/36-fast-answers-to-frequent-design-agent-questions.md)
+- [37. Open-ended balance, without open design holes](../../docs/spec/37-open-ended-balance-without-open-design-holes.md)
+- [38. Document continuity and future decision governance](../../docs/spec/38-document-continuity-and-future-decision-governance.md)
+
+**Decision priority:** relevant numbered chapter > documented design amendment > summary/index > illustrative example. If chapters conflict, do not silently choose one: open a design issue and reconcile cross-system contracts.
