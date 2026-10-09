@@ -17,7 +17,7 @@
 - [x] **SOV-P00-T12** — Define a benchmark and telemetry policy (frame time, memory, simulation step, turn time, worldgen, save/load, battle complexity).
 - [x] **SOV-P00-T13** — Define project build hygiene: no silent failed tests, no unreviewed changes to canonical schemas, clear diagnostic errors.
 - [x] **SOV-P00-T14** — Create blank but versioned fixtures `F-VALLEY`, `F-RAIN-SNOW`, `F-TRADE`, `F-BORDER`, `F-BATTLE`, `F-MANY-SEEDS`, `F-LONG-RUN`.
-- [ ] **SOV-P00-T15** — Create a separate visual-direction document shell without deciding visual style; record the 2D orthographic constraint only.
+- [x] **SOV-P00-T15** — Create a separate visual-direction document shell without deciding visual style; record the 2D orthographic constraint only.
 - [ ] **SOV-P00-T16** — Write the first delivery gate checklist and demonstrate a sample task flowing from request to verified evidence.
 
 - [x] **SOV-P00-T17** — Create a modular authoritative spec index: each gameplay domain has a focused, stable document path and no competing source of truth.
