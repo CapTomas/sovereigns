@@ -109,7 +109,7 @@ public sealed class World : ILogContext
             _inFlight = command;
             var rejection = Apply(command);
             _inFlight = null;
-            var entry = Journal.Append(Now, command, rejection);
+            var entry = Journal.Append(Now.Plus(StepMs), command, rejection);
             if (rejection is not null)
             {
                 _log.Warning($"command rejected: {rejection}", data: new Dictionary<string, string>
