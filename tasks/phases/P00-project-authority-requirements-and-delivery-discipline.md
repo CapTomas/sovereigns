@@ -18,7 +18,7 @@
 - [x] **SOV-P00-T13** — Define project build hygiene: no silent failed tests, no unreviewed changes to canonical schemas, clear diagnostic errors.
 - [x] **SOV-P00-T14** — Create blank but versioned fixtures `F-VALLEY`, `F-RAIN-SNOW`, `F-TRADE`, `F-BORDER`, `F-BATTLE`, `F-MANY-SEEDS`, `F-LONG-RUN`.
 - [x] **SOV-P00-T15** — Create a separate visual-direction document shell without deciding visual style; record the 2D orthographic constraint only.
-- [ ] **SOV-P00-T16** — Write the first delivery gate checklist and demonstrate a sample task flowing from request to verified evidence.
+- [x] **SOV-P00-T16** — Write the first delivery gate checklist and demonstrate a sample task flowing from request to verified evidence.
 
 - [x] **SOV-P00-T17** — Create a modular authoritative spec index: each gameplay domain has a focused, stable document path and no competing source of truth.
 - [x] **SOV-P00-T18** — Split the master roadmap into independently addressable phases; preserve all pre-existing task IDs and completion gates.
@@ -27,12 +27,12 @@
 - [x] **SOV-P00-T21** — Document the independent C# simulation core versus Godot 4 .NET client boundary, with permitted dependencies and test strategies.
 - [x] **SOV-P00-T22** — Create a production-quality Definition of Done and a reusable task evidence/handoff record, including integration and persistence obligations.
 - [x] **SOV-P00-T23** — Implement repository-document validation enforcing spec coverage, task uniqueness, links, routing integrity and stable identifiers.
-- [ ] **SOV-P00-T24** — Add a CI workflow to enforce the repository checks and block invalid documentation/task changes.
+- [x] **SOV-P00-T24** — Add a CI workflow to enforce the repository checks and block invalid documentation/task changes.
 - [x] **SOV-P00-T25** — Establish an ADR/change-control policy that keeps implementation decisions separate from gameplay authority and requires impact analysis.
 - [x] **SOV-P00-T26** — Define how agents handle missing specifications, conflicting requirements, failures and blocked work without inventing shortcuts.
 - [x] **SOV-P00-T27** — Create an explicit dependency matrix identifying authoritative owners and consumers of simulation fields and cross-system interfaces.
 - [x] **SOV-P00-T28** — Document how phase exit gates and completed work are reverified after changes to upstream subsystems.
-- [ ] **SOV-P00-T29** — Establish protected-branch, review and task-scope rules for parallel agents to avoid cross-feature collisions.
-- [ ] **SOV-P00-T30** — Verify a clean checkout can locate any task, load its scoped context and pass documentation checks offline without third-party dependencies.
+- [x] **SOV-P00-T29** — Establish protected-branch, review and task-scope rules for parallel agents to avoid cross-feature collisions.
+- [x] **SOV-P00-T30** — Verify a clean checkout can locate any task, load its scoped context and pass documentation checks offline without third-party dependencies.
 
 **Exit gate 00:** A new agent can locate one task by ID, retrieve the smallest authoritative context sufficient to begin, identify owners and consumers, explain the production-ready Definition of Done, validate documentation/links/task IDs offline, and submit a reviewable evidence-bearing change. A live repository must enforce branch protections, CI, ownership and review requirements before Phase 00 is VERIFIED. Do not mark tasks complete merely because generated files exist.
