@@ -18,7 +18,7 @@ Keep authoritative documents in `docs/visual/`. When game implementation exists,
 
 Include: asset ID, task ID, visual module ownership, purpose, semantic simulation inputs, planned screen/zoom ranges, orthographic camera guarantee, scale, image/export dimensions, transparency and trim/pivot convention, world-unit anchoring, variation/animation states, LOD relationships, masking/layer order, atlas/batching contract, naming convention, material/shader requirements, accessibility and color differentiation, source/provenance/license, version, reproduction instructions, comparison captures and reviewer status.
 
-**Sample asset ID:** `UNIT_FOOT_SPEAR_SHIELD_TOP_01`; not a final required filename convention. IDs must be stable across exported variants and not encode transient color selection unnecessarily.
+**Sample asset ID:** `UNIT_FOOT_SPEAR_SHIELD_TOP_01`; not a final required filename convention. The binding ID grammar is ADR-0004 (`docs/architecture/ADR-0004-units-coordinates-time-identifiers.md`), so this sample becomes `core:sprite/unit_foot_spear_shield_top_01`. IDs must be stable across exported variants and not encode transient color selection unnecessarily.
 
 ## Composition and rotation
 

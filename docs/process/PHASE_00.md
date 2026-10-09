@@ -13,7 +13,7 @@ Phase 00 must finish before large subsystem implementation. Its output is a real
 
 ## Foundation versus completion
 
-The files in this repository provide much of the Phase 00 documentation and tooling. **All Phase 00 tasks remain unchecked** until reviewer evidence and actual repository policy checks exist (such as live required GitHub checks/branch rules). Do not infer that writing a policy automatically enforces it.
+The files in this repository provide much of the Phase 00 documentation and tooling. Each Phase 00 task is checked individually once its evidence is accepted under the [Definition of Done](../agents/DEFINITION_OF_DONE.md). Evidence is in `tasks/evidence/P00.md`. SOV-P00-T16, T24 and T29 and the exit gate also require live repository enforcement (required GitHub checks and branch rules), so writing a policy does not satisfy them.
 
 ## Active prerequisites
 

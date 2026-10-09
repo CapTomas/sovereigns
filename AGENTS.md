@@ -36,6 +36,6 @@ These rules apply to Codex and Claude Code. Follow the user's active scope; repo
 
 ## Architecture and present state
 
-Godot 4 .NET is the client. The independent C#/.NET simulation owns physics, campaign, economy, warfare, world state, time and saves. No Godot types or scene-tree dependency in simulation; explicit commands and versioned data contracts cross the boundary.
+Godot 4 .NET is the client. The independent C#/.NET simulation owns physics, campaign, economy, warfare, world state, time and saves. No Godot types or scene-tree dependency in simulation; explicit commands and versioned data contracts cross the boundary. Units, coordinates, precision, time and identifiers follow [ADR-0004](docs/architecture/ADR-0004-units-coordinates-time-identifiers.md); platform targets follow [ADR-0003](docs/architecture/ADR-0003-platforms-input-distribution.md). Tracked status and evidence follow the [Definition of Done](docs/agents/DEFINITION_OF_DONE.md).
 
 This is a Phase 00 foundation: documentation and Python tooling exist; simulation and Godot execution are future work. Do not claim game builds/tests, live CI or remote protections ran without evidence. If this checkout has no `.git`, work in place and report that pull, commit and worktrees are unavailable.

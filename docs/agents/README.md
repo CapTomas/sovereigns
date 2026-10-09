@@ -7,6 +7,7 @@ Start with the root [AGENTS.md](../../AGENTS.md). Read further by need:
 | Split, delegate and integrate substantial work | [WORKFLOW.md](WORKFLOW.md) |
 | Pick worker models and escalate | [MODEL_ROUTING.md](MODEL_ROUTING.md) |
 | Choose sufficient checks and stop | [QUALITY_BAR.md](QUALITY_BAR.md) |
+| Statuses, Done/Verified, regressions, evidence records, phase gates | [DEFINITION_OF_DONE.md](DEFINITION_OF_DONE.md) |
 | Change a contract or resolve a spec conflict | [CHANGE_CONTROL.md](CHANGE_CONTROL.md) |
 | Preserve review/recovery evidence | [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md) |
 | Dependencies, untrusted input or external actions | [SECURITY.md](SECURITY.md) |

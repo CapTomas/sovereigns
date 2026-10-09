@@ -1,0 +1,8 @@
+{
+  "id": "F-LONG-RUN",
+  "version": 1,
+  "status": "blank",
+  "purpose": "Autonomous multi-century simulation/extended campaign with conservation, stability, memory and save/load diagnostics.",
+  "seed": null,
+  "scenario": null
+}

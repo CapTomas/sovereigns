@@ -124,7 +124,8 @@
     "status": "not_started",
     "spec_chapters": [
       3,
-      29
+      29,
+      35
     ],
     "phase_file": "tasks/phases/P00-project-authority-requirements-and-delivery-discipline.md",
     "context_policy": "agent must also inspect referenced upstream/downstream chapters when cross-system scope expands",
@@ -24807,7 +24808,10 @@
     "status": "not_started",
     "spec_chapters": [
       0,
-      33
+      33,
+      34,
+      35,
+      36
     ],
     "phase_file": "tasks/phases/P00-project-authority-requirements-and-delivery-discipline.md",
     "context_policy": "agent must also inspect referenced upstream/downstream chapters when cross-system scope expands",
