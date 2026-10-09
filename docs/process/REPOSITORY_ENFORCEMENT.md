@@ -2,6 +2,8 @@
 
 Policy documents do not enforce themselves. Phase 00 is not Verified until the items below are live on `CapTomas/sovereigns` and recorded in `tasks/evidence/P00.md`.
 
+**Status, 2026-10-09:** the repository is public, and every item under "Enforcement to apply once public" is live. Evidence is under SOV-P00-T24 and T29 in `tasks/evidence/P00.md`. Re-run the readback commands there after any settings change.
+
 ## Decided policy (2026-10-09)
 
 - **Sole maintainer.** GitHub does not let an author approve their own PR, so the ruleset requires **0 approvals**. Review comes from an independent `repo-reviewer` report in the evidence entry. The maintainer's merge is the acceptance ([Definition of Done](../agents/DEFINITION_OF_DONE.md)). This includes PRs that touch cross-domain contracts, save schemas or normative spec text. Raise the approval count when a second maintainer joins.
@@ -17,7 +19,7 @@ Policy documents do not enforce themselves. Phase 00 is not Verified until the i
 
 1. **Protect `main`** with [`.github/rulesets/protect-main.json`](../../.github/rulesets/protect-main.json): PR required, required status check `docs` from GitHub Actions and up to date with `main`, resolved conversations, no force push, no deletion, no bypass actors.
    `gh api --method POST repos/CapTomas/sovereigns/rulesets --input .github/rulesets/protect-main.json`
-2. **Actions hardening:** in Settings → Actions → General, allow only GitHub-owned actions, set default workflow permissions to read-only, and require approval for workflows from outside collaborators' fork PRs. The workflow already pins actions by commit SHA and requests `contents: read`.
+2. **Actions hardening:** in Settings → Actions → General, allow only GitHub-owned actions and require SHA-pinned actions. Set default workflow permissions to read-only, stop workflows from approving PRs, and require approval for workflows from outside contributors' fork PRs. The workflow pins actions by commit SHA and requests `contents: read`.
 3. **Security:** enable secret scanning and push protection (free for public repositories).
 4. **Ownership:** [`.github/CODEOWNERS`](../../.github/CODEOWNERS) names the real maintainer account. Code-owner review is not required while there is one maintainer. Never list fabricated or inactive accounts.
 5. **PR evidence:** [the PR template](../../.github/pull_request_template.md) asks for task IDs, evidence entry and reviewer verdict.
