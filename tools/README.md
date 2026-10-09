@@ -1,6 +1,6 @@
 # Repository tools
 
-These scripts require Python 3.11+, use only its standard library and run offline. Run commands from the repository root. No game executable is implemented yet; documentation checks cannot establish gameplay correctness.
+The Python scripts require Python 3.11+, use only its standard library and run offline. Run commands from the repository root. Documentation checks cannot establish gameplay correctness; the .NET and Godot checks in [SETUP](../docs/development/SETUP.md) do that for implemented code.
 
 | Need | Command |
 | --- | --- |
@@ -16,6 +16,11 @@ These scripts require Python 3.11+, use only its standard library and run offlin
 | Validate routing, hashes, ID order, fixtures, evidence for checked tasks and links | `python3 tools/validate_repo.py` |
 | Run tooling regressions and repository validation | `python3 -m unittest discover -s tools/tests -v` |
 | Refresh manifests after reviewed content changes | `python3 tools/update_manifests.py` |
+| Check this machine against the toolchain pins | `python3 tools/doctor.py` |
+| Run a fixture or scenario headless; print the state checksum | `dotnet run --project tools/Sovereigns.Headless -- run --fixture F-EMPTY` |
+| Reproduce a failure report | `dotnet run --project tools/Sovereigns.Headless -- replay <report.json>` |
+| Validate content definitions | `dotnet run --project tools/Sovereigns.Headless -- validate-content` |
+| CI helpers (Godot install, checked runs, determinism, notices) | `tools/ci/` — see [SETUP](../docs/development/SETUP.md) |
 
 Search matches all whitespace-separated words, ignoring case, in task IDs, titles and phase paths. Results are ordered by ID and limited to ten by default. Search does not infer readiness or completion from generated status fields; phase files and accepted evidence govern status. `--path` may be repeated and includes ancestor `AGENTS.md` instructions for existing or planned paths inside this repository.
 

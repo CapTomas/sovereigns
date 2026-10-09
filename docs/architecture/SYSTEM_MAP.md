@@ -51,7 +51,7 @@ Compile-time dependencies point toward the simulation:
 - Tools reference simulation projects. They are not referenced by them.
 - The Godot client references simulation public interfaces and Godot. It sends commands and reads snapshots.
 
-A CI check enforces "no Godot reference in simulation projects" once those projects exist (ADR-0001 acceptance).
+Current projects ([ADR-0005](ADR-0005-toolchain-and-repository-layout.md)): `src/Sovereigns.Simulation` (simulation), `tests/Sovereigns.Simulation.Tests` (tests of the simulation and the headless runner), `tools/Sovereigns.Headless` (tool) and `game/Sovereigns.Client.csproj` (client). `ArchitectureTests` fails if the simulation assembly references anything but the .NET base library, and the banned-API analyzer rejects wall-clock time, unseeded randomness and GUIDs in simulation code (ADR-0004 §3).
 
 ## Boundary contracts
 

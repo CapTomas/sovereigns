@@ -1,0 +1,8 @@
+{
+  "id": "F-EMPTY",
+  "version": 1,
+  "status": "defined",
+  "purpose": "Seeded empty world: world frame, fixed-step clock, command journal, structured logging and the inspection shell, with every physical field explicitly unavailable. Phase 01 pipeline and launch check.",
+  "seed": 20261009,
+  "scenario": "content/core/scenario/empty_world.json"
+}

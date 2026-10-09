@@ -1,0 +1,29 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <!-- Godot client: rendering, input and UI only. Authoritative state lives in Sovereigns.Simulation (ADR-0001). -->
+  <PropertyGroup>
+    <!-- Explicit so that the Godot editor's project upgrade does not insert its own default. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Sovereigns.Client</RootNamespace>
+    <!-- Godot.NET.Sdk adds versioned GodotSharp references itself, which central package management rejects. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <!--
+      GodotSharpEditor is referenced only in editor configurations, so one lock file cannot describe both
+      Debug and ExportRelease. The SDK pins GodotSharp and Godot.SourceGenerators to its own exact version.
+    -->
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Godot types are used throughout the client; System.* names that collide (Timer, Thread) are not used here. -->
+    <Using Include="Godot" />
+    <!-- Godot 4.5+ also has a Logger class; the client means the simulation's structured logger. -->
+    <Using Include="Sovereigns.Simulation.Diagnostics.Logger" Alias="Logger" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'ExportRelease'">
+    <!-- Client test cases run from the project (tests/ClientTests.tscn); release exports omit them. -->
+    <Compile Remove="tests/**" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../src/Sovereigns.Simulation/Sovereigns.Simulation.csproj" />
+  </ItemGroup>
+</Project>
