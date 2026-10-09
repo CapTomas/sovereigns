@@ -55,7 +55,7 @@ Return: changes/findings with file references, commands/results, unresolved risk
 
 Small maintenance work needs a concise final explanation, actual check results and material limitations. For meaningful world/simulation changes, also provide launch instructions and a few steps to see the result and inspect its data; disclose whether that view was actually run. Longer work uses [HANDOFF_TEMPLATE.md](HANDOFF_TEMPLATE.md) for durable recovery; retain paths/section IDs, decisions and outstanding work, not pasted documents or chat transcripts.
 
-Tracked status is `Not started → In progress → Ready for review → Verified`, with `Blocked` or `Superseded` carrying a reason. A phase checkbox means accepted verification. Implementers and generated worker summaries cannot self-certify it. Phase gates and required CI are evaluated when accepting tracked delivery, not invented for unrelated maintenance.
+Tracked status is `Not started → In progress → Ready for review → Verified`, with `Blocked` or `Superseded` carrying a reason; see the [Definition of Done](DEFINITION_OF_DONE.md) for criteria and evidence records. A phase checkbox means accepted verification. Implementers and generated worker summaries cannot self-certify it. Phase gates and required CI are evaluated when accepting tracked delivery, not invented for unrelated maintenance.
 
 On context reset, recover from the user's scope, task/handoff, relevant source/spec sections and accepted ADRs. Do not rely on private agent memory. Do not create a second authoritative status tracker.
 

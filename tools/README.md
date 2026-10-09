@@ -13,7 +13,7 @@ These scripts require Python 3.11+, use only its standard library and run offlin
 | Read one exact spec section | `python3 tools/task_context.py --section 3.5` |
 | Find instructions for intended edits | `python3 tools/task_context.py --path tools/` |
 | Include edit instructions in task context | `python3 tools/task_context.py SOV-P00-T01 --path tools/task_context.py --json` |
-| Validate routing, hashes and links | `python3 tools/validate_repo.py` |
+| Validate routing, hashes, ID order, fixtures, evidence for checked tasks and links | `python3 tools/validate_repo.py` |
 | Run tooling regressions and repository validation | `python3 -m unittest discover -s tools/tests -v` |
 | Refresh manifests after reviewed content changes | `python3 tools/update_manifests.py` |
 

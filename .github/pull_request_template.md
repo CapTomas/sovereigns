@@ -1,6 +1,14 @@
 ## Change
 
-Describe the problem and resulting behavior. Link an existing task ID when applicable; repository housekeeping does not need an invented gameplay task.
+Describe the problem and resulting behavior. Repository housekeeping does not need an invented gameplay task.
+
+## Tracked tasks (delete if none)
+
+- Task IDs and resulting state (Ready for review / Verified / Blocked / Superseded):
+- Evidence entry: `tasks/evidence/PNN.md` section(s):
+- Independent reviewer verdict (role/model, date) and unresolved findings:
+- Checkboxes changed in this PR:
+- Verified tasks or phase gates affected by changed contracts (rerun or reopened):
 
 ## Validation
 
@@ -15,4 +23,4 @@ Describe the problem and resulting behavior. Link an existing task ID when appli
 - Material performance measurements:
 - Consequential architecture decision or remaining limitation:
 
-Delete unused items. Reuse existing acceptance evidence instead of repeating a handoff packet. Keep tracked tasks unchecked until their required review accepts that evidence.
+Delete unused items. Reuse existing evidence instead of repeating it. Merging this PR accepts any checkbox changes it contains (see `docs/agents/DEFINITION_OF_DONE.md`).

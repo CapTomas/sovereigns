@@ -54,7 +54,7 @@ World/simulation increments also need continuous human-visible feedback: an earl
 
 | Location | Responsibility |
 |---|---|
-| `docs/spec/` | Authoritative game mechanics, 39 stable numbered chapters |
+| `docs/spec/` | Authoritative game mechanics (Game Design Bible 1.1.0), 39 stable numbered chapters |
 | `docs/architecture/` | Accepted implementation decisions and state ownership |
 | `tasks/phases/` | 55 delivery phases; source of reviewed checkbox status |
 | `meta/` | Generated task/spec routing metadata |
@@ -66,4 +66,4 @@ World/simulation increments also need continuous human-visible feedback: an earl
 
 Godot 4 .NET presents the world and accepts commands; independent C#/.NET owns simulation, time and saves, without Godot dependencies. Exact runtime releases are Phase 01 decisions. Preserve one authoritative world across strategic and tactical views.
 
-This checkout is connected to the private [CapTomas/sovereigns repository](https://github.com/CapTomas/sovereigns). Offline validators do not establish game execution, remote CI or phase completion. Tracked tasks remain unchecked until their required review accepts the evidence.
+This checkout is connected to the [CapTomas/sovereigns repository](https://github.com/CapTomas/sovereigns). Offline validators do not establish game execution, remote CI or phase completion. Tracked tasks remain unchecked until their required review accepts the evidence.

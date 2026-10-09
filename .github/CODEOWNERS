@@ -1,0 +1,4 @@
+# Sole maintainer owns every path until additional maintainers join.
+# Review is not required by the ruleset (one maintainer cannot approve own PRs);
+# see docs/process/REPOSITORY_ENFORCEMENT.md.
+* @CapTomas

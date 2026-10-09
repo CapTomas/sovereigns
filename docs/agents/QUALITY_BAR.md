@@ -37,6 +37,34 @@ Broad regression suites belong at affected integration boundaries and explicit a
 5. No fixed coding/testing percentage or compulsory test quota. If validation dominates the work, reassess duplication and test scope; retain checks justified by actual risk.
 6. Stop when acceptance is met, required checks pass and material review findings are resolved. More rounds need a concrete unresolved concern.
 
+## Test layers
+
+Most checks belong at the lowest layer that can catch the defect. Add a higher layer only for a failure mode the lower ones cannot see.
+
+| Layer | Catches | Runs |
+|---|---|---|
+| Deterministic unit and property tests | Local logic, numerical invariants, boundaries, units; properties such as conservation or monotonicity | Every PR |
+| Scenario/integration tests | Seeded fixture or command-stream runs across real producer/consumer boundaries, with state checksums | PRs touching the involved modules; all on `main` |
+| Long runs | Multi-year stability, conservation drift, memory growth, many-seed anomalies (`F-LONG-RUN`, `F-MANY-SEEDS`) | Scheduled runs and phase gates, not every PR |
+| Client/UI behavior | Godot headless checks of input actions, command dispatch and snapshot consumption | PRs touching the client |
+| Manual review | Plausibility, readability and visual QA through the human inspection path | Task evidence where required; phase gates |
+
+## Benchmarks and telemetry
+
+- **Metrics**, measured once their subsystem exists: client frame time (p50/p95/p99), peak memory and managed heap, simulation step cost per subsystem and per simulated day, strategic turn resolution time, world generation time per size preset, save/load time and size, and battle step cost against regiment/soldier count.
+- **Method:** release build on stated hardware, OS, commit, seed or fixture; warm-up; repeated runs reporting median and spread; comparison with the previous baseline on the same machine.
+- **Budgets** come from measurements on agreed reference hardware (spec §29.11, §32.9) and are recorded when set. Until a budget exists, report measurements without pass/fail claims. Never invent numbers.
+- **Cadence:** when a change plausibly affects a measured path, and at phase gates. Results go in the task's evidence entry; baselines live beside the benchmark code once it exists.
+- **Telemetry** is development-only local logging and metrics. Sending any data off the player's machine requires an ADR and explicit player consent.
+
+## Build hygiene
+
+- A failing required check blocks merge. Flaky tests are fixed, or quarantined with a recorded reason and owner. They are never retried until green or silently skipped.
+- Compiler and analyzer warnings that indicate defects are errors in CI. The exact configuration is SOV-P01-T06.
+- Authoritative documents and schemas (spec chapters, ADRs, save and content schemas, `meta/` manifests) change only through reviewed PRs. The validator rejects spec edits without a manifest refresh.
+- Diagnostics name the failing input, the violated expectation and where to fix it.
+- Do not commit generated build output. The only generated files tracked are the `meta/` manifests from `tools/update_manifests.py`.
+
 ## Human-visible feedback during development
 
 Each meaningful generated-world or simulation behavior increment must have a usable inspection path in the development build before its visual acceptance can be considered satisfied. Automated tests alone do not establish that the result is understandable, plausible or useful. Build the reusable viewer shell early, then expose each subsystem as it is implemented; do not wait for the environmental laboratory, final campaign UI or art polish.
@@ -55,6 +83,6 @@ Internal refactors with unchanged behavior reuse the existing inspection path. R
 
 Report what changed, why, commands run/results, and material limitations. A task with affected numerical, persistence or performance contracts also needs the corresponding seed/scenario, compatibility or measured budget evidence. Use the [handoff](HANDOFF_TEMPLATE.md) only to the depth needed for review and recovery.
 
-Independent review is warranted for consequential behavior/contract changes and is required for tracked VERIFIED status. Routine low-risk maintenance can finish with the orchestrator's inspection. Do not invent review, remote CI, game execution or performance results.
+Independent review is warranted for consequential behavior/contract changes and is required for tracked VERIFIED status (see the [Definition of Done](DEFINITION_OF_DONE.md)). Routine low-risk maintenance can finish with the orchestrator's inspection. Do not invent review, remote CI, game execution or performance results.
 
 A phase is accepted only after its explicit tasks and exit criteria are reviewed, relevant regressions pass, integrated evidence is reproducible and blocking defects are resolved. Phase acceptance is separate from a small implementation's local checks. The present repo can validate documentation and Python tools; it cannot yet demonstrate unimplemented simulation or Godot behavior.

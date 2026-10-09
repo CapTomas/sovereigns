@@ -14,6 +14,43 @@ class TestContext(unittest.TestCase):
     def test_repository(self):
         self.assertTrue(validate_repo.check())
 
+    def test_task_id_order(self):
+        self.assertEqual(validate_repo.task_id_errors('03',['SOV-P03-T01','SOV-P03-T02']),[])
+        for ids in (['SOV-P03-T01','SOV-P03-T03'],['SOV-P03-T02','SOV-P03-T01'],['SOV-P04-T01']):
+            with self.subTest(ids=ids):
+                self.assertTrue(validate_repo.task_id_errors('03',ids))
+
+    def test_checked_task_needs_evidence(self):
+        self.assertEqual(validate_repo.evidence_errors('00',[],None),[])
+        self.assertTrue(validate_repo.evidence_errors('00',['SOV-P00-T01'],None))
+        self.assertTrue(validate_repo.evidence_errors('00',['SOV-P00-T01'],'Body mentions SOV-P00-T01 only.'))
+        self.assertTrue(validate_repo.evidence_errors('00',['SOV-P00-T10'],'## SOV-P00-T100'))
+        self.assertEqual(validate_repo.evidence_errors('00',['SOV-P00-T01'],'## SOV-P00-T01, SOV-P00-T02 — ADRs'),[])
+        self.assertTrue(validate_repo.evidence_errors('00',['SOV-P00-T01'],'```\n# SOV-P00-T01\n```'))
+
+    def test_ruleset_checks_match_workflow_jobs(self):
+        workflow='name: CI\non: push\njobs:\n  docs:\n    runs-on: x\n    steps:\n      - name: step\n  build:\n    name: Build game\n'
+        checks=validate_repo.workflow_checks(workflow)
+        self.assertEqual(checks,{'docs','build','Build game'})
+        ruleset={'rules':[{'type':'required_status_checks',
+                           'parameters':{'required_status_checks':[{'context':'docs'},{'context':'missing'}]}}]}
+        self.assertEqual(len(validate_repo.ruleset_errors('r.json',ruleset,checks)),1)
+        self.assertTrue(validate_repo.ruleset_errors('r.json',{},checks))
+
+    def test_fixture_manifest_rules(self):
+        blank={'id':'F-X','version':1,'status':'blank','purpose':'p','seed':None,'scenario':None}
+        self.assertEqual(validate_repo.fixture_errors('F-X',blank),[])
+        for change in ({'id':'F-Y'},{'version':0},{'version':True},{'purpose':' '},{'seed':7},
+                       {'status':'done'},{'status':'defined'},{'status':'defined','seed':7,'scenario':'no/such/file'},
+                       {'status':'defined','seed':7,'scenario':'../outside.json'}):
+            with self.subTest(change=change):
+                self.assertTrue(validate_repo.fixture_errors('F-X',{**blank,**change}))
+
+    def test_spec_version_picks_newest(self):
+        record='**1.1.0 · 2026-10-08:** a\n**1.10.0 · 2027-01-02:** b\n**1.9.3 · 2026-12-01:** c'
+        self.assertEqual(validate_repo.spec_version(record),('1.10.0','2027-01-02'))
+        self.assertIsNone(validate_repo.spec_version('no entries'))
+
     def test_task_context(self):
         task=task_context.select_task('SOV-P00-T01')
         self.assertIn(0,task['spec_chapters'])

@@ -1,5 +1,7 @@
 # Gameplay and simulation specifications
 
+**Game Design Bible version:** 1.1.0 (2026-10-08). The version history is the living-version record in [§38.4](38-document-continuity-and-future-decision-governance.md#384-living-version-record). The source monolith fingerprint is in `meta/migration.json`. Update this line with every §38.4 entry; `tools/validate_repo.py` checks that they match.
+
 Each numbered chapter is a **normative source** for the behavior it describes. The files below contain the original design rules, split without summarizing or dropping mechanics. Do **not** read all chapters for each task.
 
 Use `python3 tools/task_context.py SOV-Pxx-Tyy` to discover the chapters required for the active task. Read the indicated sections plus explicit upstream/downstream consumers when the change affects them. Do not treat fast-answer indexes or agent briefings as replacements for normative chapters.
