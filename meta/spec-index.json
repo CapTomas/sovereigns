@@ -200,8 +200,8 @@
   "33": {
     "title": "Agent implementation charter and delivery order",
     "path": "docs/spec/33-agent-implementation-charter-and-delivery-order.md",
-    "sha256": "9f9b573250d0e297feef1b92716292aaaf3accf0ed7d8cecc2af26716e82db87",
-    "bytes": 9032
+    "sha256": "3c9c66dd79cdf670f4bf91c71de9fa99014e67b02ec5815aaab92373c4e38175",
+    "bytes": 9158
   },
   "34": {
     "title": "Canonical decisions register",

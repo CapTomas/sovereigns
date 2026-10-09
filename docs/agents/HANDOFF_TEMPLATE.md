@@ -1,36 +1,37 @@
 # Task handoff and acceptance record
 
-**Task ID:** `SOV-PNN-TNN`  
-**State:** Ready for review / Verified / Blocked  
-**Commit / PR:**  
-**Author / reviewer:**  
-**Date:**
+Use this for a tracked task, a multi-agent handoff or a change that needs durable review evidence. A small housekeeping change can use the same information in its PR or final summary. Delete optional fields that do not apply; do not create an empty evidence packet.
 
-## Intended behavior
-- Relevant design chapters and section IDs:
-- User/player-visible outcome:
-- Explicit exclusions or dependencies (not falsely claimed complete):
+**Task / objective:** existing `SOV-PNN-TNN`, or the requested repository change  
+**State:** Ready for review / Verified / Blocked, if tracked  
+**Change reference:** commit/PR, or changed files when Git is unavailable  
+**Author / reviewer:** when applicable
 
-## Ownership and integration
-- Authoritative state and owning module:
-- Inputs and producing subsystems:
-- Outputs and consuming subsystems:
-- Units, coordinate/time rules and randomness:
-- Persistence / migration / cache invalidation:
+## Outcome
 
-## Evidence
-- Unit/property tests (exact commands and outputs):
-- Integrated fixtures + world seed:
-- Negative/boundary cases:
-- Save/replay evidence:
-- Benchmark environment, budget and measured results (or reason not applicable):
-- Manual review capture/observation (if applicable):
-- Documentation, ADR and schema updates:
+- What changed and which acceptance criteria it satisfies:
+- Relevant authority paths/sections or decisions:
+- Remaining limitations or blockers:
 
-## Review
-- Risks and known defects:
-- Previously verified scenarios rerun:
-- Reviewer verdict and evidence link:
-- Phase gate affected:
+## Validation
 
-**Never manufacture evidence or mark a task VERIFIED based on a generated checklist alone.**
+- Commands/checks actually run and their result:
+- Any required check not run, with the concrete reason:
+- Review findings and their resolution:
+
+## Add only when the change affects them
+
+- Authoritative owner, producer/consumer contract and units/cadence:
+- Deterministic seed or reproducible scenario:
+- Human inspection path for changed world/simulation behavior: exact launch command, seed/configuration, location/entity/time, view/layer, short steps and expected observations; actual observation or execution limitation:
+- Persistence, replay or migration evidence:
+- Performance risk, measurement environment and result:
+- Helpful screenshot/capture or other manual observation, when applicable:
+- ADR, schema or documentation updates:
+
+## Tracked task acceptance
+
+- Required reviewer verdict and evidence reference:
+- Relevant phase gate or previously accepted task evidence affected:
+
+**Report observed results only. A generated checklist, worker assertion or passing scaffold cannot establish gameplay completion. Keep a tracked task unchecked until its required review accepts the evidence.**

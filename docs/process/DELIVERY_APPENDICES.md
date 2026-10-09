@@ -1,5 +1,7 @@
 # C. Cross-phase integration rails (always active)
 
+> Historical process reference. Gameplay invariants and integrated acceptance scenarios remain relevant. Current agent execution, context loading, evidence scope and verification cadence are defined in `docs/agents/`; do not apply the archived per-task ceremony to unrelated maintenance or every small edit.
+
 The following are *ongoing requirements*, not permission to skip a phase. Every integrated build must continue to satisfy them.
 
 ## C1. Five mandatory living invariants

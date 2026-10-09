@@ -1,8 +1,10 @@
 # Task backlog
 
-The task tracker is divided into 55 small, ordered phase documents; **phase files own checkbox status**. `meta/tasks.json` is an index generated from those files. A task is not complete because code compiles; it is VERIFIED only when its evidence and phase exit requirements are satisfied. `meta/tasks.json` statuses remain `not_started` until task-evidence management is implemented; they are not the authority for completion.
+The task tracker is divided into 55 ordered phase documents; **phase files own checkbox status**. `meta/tasks.json` is a navigation index, not completion authority. A tracked task becomes **Verified** only after its required review accepts evidence against its acceptance criteria; a phase completes when its exit gate is satisfied. Do not treat a compiling scaffold or a successful document validator as gameplay completion.
 
-Read [the agent workflow](../docs/agents/WORKFLOW.md), [the quality contract](../docs/agents/QUALITY_BAR.md), and [the phase process](../docs/process/ORIGINAL_DELIVERY_RULES.md). Start with Phase 00. Preserve existing IDs; append new IDs. Work in dependency order unless a reviewed ADR documents the change.
+For gameplay implementation, use [the agent workflow](../docs/agents/WORKFLOW.md) and [the proportional quality contract](../docs/agents/QUALITY_BAR.md). Route one relevant task with `python3 tools/task_context.py SOV-PNN-TNN --list`, then read its task/phase gate and affected authority. Phase 00 is the initial delivery phase; follow actual dependencies and resolve missing prerequisites rather than starting unrelated gameplay. Preserve existing IDs and checked history; append IDs only when creating real new tracked work.
+
+Repository housekeeping, agent instructions, documentation navigation and tooling improvements can proceed directly under the user's objective without a gameplay task ID or completion of every earlier phase. Do not load all phase files or the [historical process archive](../docs/process/README.md) for a focused change. Current engineering workflow lives in `docs/agents/`; phase-specific acceptance requirements and gameplay invariants remain in force.
 
 - [Phase 00 — Project authority, requirements and delivery discipline](phases/P00-project-authority-requirements-and-delivery-discipline.md) · 30 tasks
 - [Phase 01 — Repository, toolchain, executable shell and continuous verification](phases/P01-repository-toolchain-executable-shell-and-continuous-verification.md) · 16 tasks

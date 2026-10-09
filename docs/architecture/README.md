@@ -4,4 +4,4 @@
 - [ADR-0002 — Document and task authority](ADR-0002-documentation-and-task-authority.md)
 - [System map, authoritative owners and contracts](SYSTEM_MAP.md)
 
-For each new design-level implementation choice, add a dated ADR describing context, options, chosen method, contract impact, tests and migration concerns. Gameplay rules remain in `docs/spec/`.
+Use an ADR for consequential decisions about ownership, persistence, public boundaries, runtime choices or expensive-to-reverse tradeoffs. Routine fixes and local implementation choices need no ADR. Follow [change control](../agents/CHANGE_CONTROL.md); gameplay rules remain in `docs/spec/`.

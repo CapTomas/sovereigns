@@ -1,5 +1,7 @@
 # A. How to execute this roadmap
 
+> Historical process reference. Use `docs/agents/WORKFLOW.md` and `QUALITY_BAR.md` for current execution, delegation and proportional checks. Retain the gameplay invariants, fixture definitions and explicit task/phase acceptance requirements below; the historical per-edit packets and blanket regression instructions are superseded by the current working policy.
+
 ## A1. Order, priority and working state
 
 The phase numbers are the **default dependency order**, not suggestions to implement subsystems in isolation. Complete each task and its local checks, then satisfy the phase exit gate before moving to the next phase. When later work reveals a genuine missing prerequisite, add it to the appropriate earlier phase with an ID and test; do not quietly invent a parallel solution. The final game scope is the Game Design Bible, not only the early integrated reference builds.

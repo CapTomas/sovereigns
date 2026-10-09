@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parent.parent
@@ -49,10 +50,40 @@ def check():
                     check_ok(str(spec) in index,f'Bad chapter in {tid}: {spec}')
     check_ok(discovered==set(tasks),'Task set and file inventory differ')
     check_ok(len(discovered)==1072,f'Unexpected number of tasks: {len(discovered)}')
-    for item in ['AGENTS.md','README.md','docs/agents/QUALITY_BAR.md','docs/agents/WORKFLOW.md',
-                 'docs/architecture/ADR-0001-runtime.md','.github/workflows/repo-docs.yml']:
+    for item in ['AGENTS.md','CLAUDE.md','README.md','docs/agents/QUALITY_BAR.md','docs/agents/WORKFLOW.md',
+                 'docs/agents/MODEL_ROUTING.md','docs/architecture/ADR-0001-runtime.md',
+                 '.github/workflows/repo-docs.yml','.codex/config.toml',
+                 '.claude/agents/repo-scout.md','.claude/agents/repo-implementer.md',
+                 '.claude/agents/repo-reviewer.md']:
         check_ok((ROOT/item).exists(),f'Missing foundation artifact {item}')
-    for path in ROOT.rglob('README.md'):
+    claude=ROOT/'CLAUDE.md'
+    if claude.exists():
+        check_ok('@AGENTS.md' in claude.read_text(encoding='utf-8').splitlines(),
+                 'CLAUDE.md must import the shared AGENTS.md policy')
+    config_paths=[ROOT/'.codex/config.toml']
+    config_paths.extend(ROOT/'.codex/agents'/f'repo-{role}.toml'
+                        for role in ['scout','implementer','reviewer'])
+    agent_names=set()
+    for path in config_paths:
+        check_ok(path.is_file(),f'Missing Codex adapter {path.relative_to(ROOT)}')
+        if not path.is_file(): continue
+        try:
+            config=tomllib.loads(path.read_text(encoding='utf-8'))
+        except tomllib.TOMLDecodeError as exc:
+            check_ok(False,f'Invalid TOML {path.relative_to(ROOT)}: {exc}')
+            continue
+        if path.parent.name=='agents':
+            for key in ['name','description','developer_instructions']:
+                check_ok(isinstance(config.get(key),str) and bool(config[key].strip()),
+                         f'{path.relative_to(ROOT)} needs a nonempty {key}')
+            name=config.get('name')
+            if isinstance(name,str):
+                check_ok(name not in agent_names,f'Duplicate Codex agent name {name}')
+                agent_names.add(name)
+    navigation=set(ROOT.rglob('README.md'))
+    navigation.update(ROOT.rglob('AGENTS.md'))
+    navigation.update((ROOT/'docs/agents').glob('*.md'))
+    for path in sorted(navigation):
         for uri in re.findall(r'(?<!!)\[[^\]]+\]\(([^)#]+)(?:#[^)]*)?\)',path.read_text(encoding='utf-8')):
             if uri.startswith(('http://','https://','mailto:')): continue
             check_ok((path.parent/uri).exists(),f'Broken relative link {path.relative_to(ROOT)} -> {uri}')
@@ -60,7 +91,7 @@ def check():
         print('FAILED:')
         for error in errors: print(' - '+error)
         return False
-    print(f'PASS: {len(index)} authoritative design chapters, {len(phases)} phases, {len(discovered)} unique tasks; exit gates, hashes, routing and README links valid.')
+    print(f'PASS: {len(index)} authoritative design chapters, {len(phases)} phases, {len(discovered)} unique tasks; exit gates, hashes, routing, agent adapters and navigation links valid.')
     print('Scope: repository documentation validation; not Godot/.NET game execution or remote CI enforcement.')
     return True
 

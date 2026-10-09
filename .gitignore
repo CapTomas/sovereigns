@@ -22,3 +22,17 @@ __pycache__/
 coverage/
 TestResults/
 *.tmp
+
+# Machine-local agent settings and runtime output (keep shared adapters tracked)
+.claude/settings.local.json
+.claude/worktrees/
+.codex/config.local.toml
+.codex-log/
+
+# Share project Claude definitions despite machine-wide .claude/ ignores.
+!.claude/
+.claude/*
+!.claude/README.md
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/*.md

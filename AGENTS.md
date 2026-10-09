@@ -1,14 +1,41 @@
-# Sovereigns agent entrypoint
+# Sovereigns: shared agent instructions
 
-Read this first; then use task-specific routing. Avoid broad document scans.
+These rules apply to Codex and Claude Code. Follow the user's active scope; repository preparation, tooling and documentation work do not require starting a gameplay phase or inventing a task ID.
 
-1. **Find one task:** `python3 tools/task_context.py SOV-Pxx-Tyy --list`. Read the phase's target task and the routed normative spec chapters. Additional upstream/downstream chapters become mandatory if your changes affect them. Never assume the routed list is exhaustive after scope changes.
-2. **Authority:** `docs/spec/` governs game behavior; `docs/architecture/` governs reviewed implementation decisions; `tasks/phases/` governs delivery and verified task status. Briefings and machine indexes are navigational, not new gameplay authority.
-3. **Architecture:** Godot 4 .NET is the client; independent C#/.NET simulation owns physics, campaign, economy, warfare, world state, time and save semantics. No simulation dependency on Godot types or scene tree. Explicit commands and versioned data contracts cross the boundary.
-4. **Production-quality increments only:** no mocked implementation masquerading as delivered functionality, magic numbers without provenance, duplicate authoritative state, commented-out failing tests, deliberately ignored save/load, or unmeasured high-risk performance. Build the correct foundation rather than disposable prototypes. Read `docs/agents/QUALITY_BAR.md`.
-5. **Before coding:** identify authoritative inputs/outputs, owning subsystem, units/coordinate convention, time cadence, observability, determinism, failure modes, persistence, performance risk and acceptance criteria. If a fundamental decision is missing, record and resolve it via ADR/design process, not an undocumented guess.
-6. **After coding:** run targeted and existing regression tests, check the reproducible scenarios, review invariants and commit evidence. Do not mark checkboxes verified yourself without accepted review evidence.
-7. **Controlled changes:** edit only task-scope areas; resolve interface changes with consuming subsystems, update spec/tests/ADRs when needed. Never silently reduce requirements to pass a phase gate.
-8. **Current scaffold:** Phase 00 documents/tools are real; simulation source and Godot project are not implemented yet. Do not assert game or integration tests passed until they actually exist and ran.
+## Start with the smallest useful context
 
-To list all numbered gameplay modules: `docs/spec/README.md`. For agent work instructions: `docs/agents/WORKFLOW.md`.
+- Inspect the working tree before editing; preserve unrelated changes. Use `rg` and targeted reads.
+- Unknown task: `python3 tools/task_context.py --search "keywords"`. Known task: `python3 tools/task_context.py SOV-Pxx-Tyy --task`, then `--list` for its routes. With no arguments the router shows a short navigation guide.
+- Read scoped `AGENTS.md` files for the paths you touch, even if the client did not load them automatically. Use the router's `--path` option to find them.
+- Read relevant spec sections and affected owners/consumers; expand context when scope changes. Do not load every chapter, phase or process archive.
+- `docs/spec/` owns game behavior; `docs/architecture/` owns accepted implementation decisions; `tasks/phases/` owns delivery and reviewed checkbox status. `meta/` is navigation. Current working practices live in `docs/agents/`; historical process copies are reference material.
+
+## Exercise senior engineering judgment
+
+- **KISS:** choose the simplest complete solution with explicit ownership and readable contracts.
+- **YAGNI:** implement the requested behavior. Avoid speculative features, frameworks, extension points and dependencies.
+- **SOLID, pragmatically:** keep cohesive responsibilities, small consumer-facing interfaces, substitutable implementations and dependencies pointing toward the domain. Add abstractions at real boundaries; do not create an interface for every class.
+- Reuse established logic; keep authoritative state in one place. Prefer composition and direct data flow over deep inheritance and hidden coupling.
+- Before a substantial change, identify scope, acceptance, inputs/outputs, owners and material risks. Units, cadence, determinism, persistence and performance matter when the change affects them. A small fix needs no elaborate design packet.
+- Record consequential architectural decisions; resolve routine implementation choices yourself. Follow [change control](docs/agents/CHANGE_CONTROL.md) for real contract/spec conflicts.
+
+## Orchestrate deliberately
+
+- The front model owns scope, decisions, delegation, integration and the final result. Delegate independent useful work proactively when it saves time or improves quality; do small tightly coupled work directly.
+- Choose the least expensive available model likely to finish each assignment correctly. Use [model routing](docs/agents/MODEL_ROUTING.md) for model tiers, overrides and escalation; do not assume every provider/model is available.
+- Give workers a bounded goal, owned paths, exact context, acceptance/check scope and expected output. Assign one writer per file or authoritative contract; read-only discovery can run in parallel.
+- Keep the front model on integration and unresolved decisions while workers work. Reuse workers for follow-ups, escalate repeated failures, and collect results before reporting completion. Full protocol: [workflow](docs/agents/WORKFLOW.md).
+
+## Verify proportionally, then stop
+
+- Follow [quality and verification](docs/agents/QUALITY_BAR.md). Reuse existing checks and add tests only for meaningful changed behavior or regression risks.
+- Documentation/small reversible edits normally need inspection or a relevant validator. Behavior changes need focused tests; broad regression, integration, persistence and performance checks are triggered by impact or explicit acceptance gates.
+- Deliver human-visible feedback with meaningful world/simulation changes: extend the reusable development viewer with real layers, inspected values or tables, and provide a reproducible launch/seed/scenario plus short inspection steps. Do not postpone the first usable view until later UI/polish phases. See the human-feedback rule in `QUALITY_BAR.md`.
+- Batch checks after coherent changes. Repeat only after relevant edits, failures or new evidence. No tests of tests, coverage quotas, blanket benchmark runs or fixed coding/testing ratios.
+- Report the change, actual commands/results and material limitations concisely. Never fabricate evidence, weaken assertions to conceal defects or self-certify a tracked task as VERIFIED.
+
+## Architecture and present state
+
+Godot 4 .NET is the client. The independent C#/.NET simulation owns physics, campaign, economy, warfare, world state, time and saves. No Godot types or scene-tree dependency in simulation; explicit commands and versioned data contracts cross the boundary.
+
+This is a Phase 00 foundation: documentation and Python tooling exist; simulation and Godot execution are future work. Do not claim game builds/tests, live CI or remote protections ran without evidence. If this checkout has no `.git`, work in place and report that pull, commit and worktrees are unavailable.

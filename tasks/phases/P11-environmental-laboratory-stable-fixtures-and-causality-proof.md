@@ -1,14 +1,14 @@
 ## Phase 11 — Environmental laboratory, stable fixtures and causality proof
 **Depends on:** 03–10.  
-**Outcome:** A trustworthy world simulator can be inspected, advanced and validated without any campaign gameplay.  
-**GDB:** §§3–6, 29, 31.7–31.8, 32.10–32.11.
+**Outcome:** The existing inspection shell becomes a complete environmental laboratory where a trustworthy world simulator can be inspected, advanced and validated without any campaign gameplay.  
+**GDB:** §§3–6, 26.13, 29, 31.7–31.8, 32.10–32.11.
 
 - [ ] **SOV-P11-T01** — Build a headless environmental run mode with seed, map bounds, time advance and output captures.
-- [ ] **SOV-P11-T02** — Build a lightweight orthographic debug atlas viewer with pan, zoom, inspect and time controls.
-- [ ] **SOV-P11-T03** — Expose one coordinate inspector showing measured, derived and cached physical fields with units.
+- [ ] **SOV-P11-T02** — Complete the existing lightweight orthographic debug atlas viewer as an integrated environmental laboratory with pan, zoom, inspect and authoritative time controls.
+- [ ] **SOV-P11-T03** — Extend the existing coordinate inspector to show all implemented measured, derived and cached physical fields with units.
 - [ ] **SOV-P11-T04** — Expose provenance and last-updated timing for all important environment values.
-- [ ] **SOV-P11-T05** — Add overlays for elevation, slope, aspect, watershed, soil, vegetation, surface water and groundwater.
-- [ ] **SOV-P11-T06** — Add overlays for pressure, air heat, cloud, humidity, wind, precipitation, snow and time of day.
+- [ ] **SOV-P11-T05** — Complete the existing overlay set for elevation, slope, aspect, watershed, soil, vegetation, surface water and groundwater.
+- [ ] **SOV-P11-T06** — Complete the existing overlay set for pressure, air heat, cloud, humidity, wind, precipitation, snow and time of day.
 - [ ] **SOV-P11-T07** — Introduce event tracer from source rainstorm to flood and local ground condition change.
 - [ ] **SOV-P11-T08** — Create permanent `F-RAIN-SNOW` and `F-VALLEY` reference world fixtures.
 - [ ] **SOV-P11-T09** — Record golden measurements at representative mountain, river, coast, valley and desert sites.
@@ -24,4 +24,4 @@
 - [ ] **SOV-P11-T19** — Demonstrate user-readable explanation for why a valley flooded and nearby crops failed.
 - [ ] **SOV-P11-T20** — Freeze an environmental reference-build tag only after all fixtures and diagnostics pass.
 
-**Exit gate 11 — Checkpoint B — Living world:** A saved reference valley shows a forecastable storm, wind, rain, wet soil, snow/melt and changing river; data is queryable, stable, conserved and reproducible.
+**Exit gate 11 — Checkpoint B — Living world:** The reusable inspection shell opens a saved reference valley showing a forecastable storm, wind, rain, wet soil, snow/melt and changing river; data is queryable, stable, conserved and reproducible.
