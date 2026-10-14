@@ -52,6 +52,12 @@ public readonly record struct Binding(BindingKind Kind, Key Key, MouseButton But
         [Key.Bracketright] = "]",
         [Key.Equal] = "=",
         [Key.Minus] = "-",
+        [Key.Period] = ".",
+        [Key.Key1] = "1",
+        [Key.Key2] = "2",
+        [Key.Key3] = "3",
+        [Key.Key4] = "4",
+        [Key.Key5] = "5",
     };
 
     public static bool TryParse(string? text, out Binding binding, out string error)

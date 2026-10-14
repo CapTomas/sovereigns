@@ -18,8 +18,10 @@ The Python scripts require Python 3.11+, use only its standard library and run o
 | Refresh manifests after reviewed content changes | `python3 tools/update_manifests.py` |
 | Check this machine against the toolchain pins | `python3 tools/doctor.py` |
 | Run a fixture or scenario headless; print the state checksum | `dotnet run --project tools/Sovereigns.Headless -- run --fixture F-EMPTY` |
-| Reproduce a failure report | `dotnet run --project tools/Sovereigns.Headless -- replay <report.json>` |
+| Reproduce a failure report | `dotnet run --project tools/Sovereigns.Headless -- replay <report.json> [--save <save.json>]` |
+| Save at the end of a run; continue from a save | `... run --fixture F-KERNEL --for-ms 8640000000 --save day100.json`, then `... run --load day100.json --for-ms <ms>` |
 | Validate content definitions | `dotnet run --project tools/Sovereigns.Headless -- validate-content` |
+| Reference random-stream values (ADR-0007) | `python3 tools/random_stream_reference.py <seed> <purpose> [key ...]` |
 | CI helpers (Godot install, checked runs, determinism, notices) | `tools/ci/` — see [SETUP](../docs/development/SETUP.md) |
 
 Search matches all whitespace-separated words, ignoring case, in task IDs, titles and phase paths. Results are ordered by ID and limited to ten by default. Search does not infer readiness or completion from generated status fields; phase files and accepted evidence govern status. `--path` may be repeated and includes ancestor `AGENTS.md` instructions for existing or planned paths inside this repository.

@@ -28,7 +28,33 @@ public static class InputActions
     public const string LayerPrevious = "layer_previous";
     public const string ToggleHud = "toggle_hud";
     public const string FailureReport = "failure_report";
+    public const string TimeTogglePause = "time_toggle_pause";
+    public const string TimeStep = "time_step";
+    public const string TimeSpeed1 = "time_speed_1";
+    public const string TimeSpeed2 = "time_speed_2";
+    public const string TimeSpeed3 = "time_speed_3";
+    public const string TimeSpeed4 = "time_speed_4";
+    public const string TimeSpeed5 = "time_speed_5";
+    public const string SetBreakpoint = "set_breakpoint";
+    public const string AcknowledgeDecision = "acknowledge_decision";
     public const string Quit = "quit";
+
+    /// <summary>The speed actions in preset order; action <c>i</c> selects <c>TimeControl.Presets[i]</c>.</summary>
+    public static IReadOnlyList<string> TimeSpeeds { get; } = [TimeSpeed1, TimeSpeed2, TimeSpeed3, TimeSpeed4, TimeSpeed5];
+
+    /// <summary>The preset index of a speed action, or -1 when <paramref name="action"/> is not one.</summary>
+    public static int SpeedPresetOf(string action)
+    {
+        for (var i = 0; i < TimeSpeeds.Count; i++)
+        {
+            if (TimeSpeeds[i] == action)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     public static IReadOnlyList<ActionDefinition> All { get; } =
     [
@@ -47,6 +73,15 @@ public static class InputActions
         new(LayerPrevious, "Select the previous layer", ["key:Bracketleft"]),
         new(ToggleHud, "Show or hide the debug HUD", ["key:F3"]),
         new(FailureReport, "Write a manual failure report without stopping", ["key:F9"]),
+        new(TimeTogglePause, "Pause or resume simulation time", ["key:Space"]),
+        new(TimeStep, "Advance exactly one simulation step (also while paused)", ["key:Period"]),
+        new(TimeSpeed1, "Run at 1 simulated second per real second", ["key:Key1"]),
+        new(TimeSpeed2, "Run at 1 simulated minute per real second", ["key:Key2"]),
+        new(TimeSpeed3, "Run at 1 simulated hour per real second", ["key:Key3"]),
+        new(TimeSpeed4, "Run at 1 simulated day per real second", ["key:Key4"]),
+        new(TimeSpeed5, "Run at 1 simulated week per real second", ["key:Key5"]),
+        new(SetBreakpoint, "Stop time at the next standard-time midnight until acknowledged", ["key:B"]),
+        new(AcknowledgeDecision, "Acknowledge the oldest pending decision so time can continue", ["key:Enter"]),
         new(Quit, "Quit the client", ["key:Ctrl+Q", "key:Meta+Q"]),
     ];
 
@@ -60,6 +95,11 @@ public static class InputActions
         new("Place marker", [PlaceMarker]),
         new("Remove marker", [RemoveMarker]),
         new("Layer prev/next", [LayerPrevious, LayerNext]),
+        new("Pause", [TimeTogglePause]),
+        new("Step", [TimeStep]),
+        new("Speed", [TimeSpeed1, TimeSpeed2, TimeSpeed3, TimeSpeed4, TimeSpeed5]),
+        new("Breakpoint", [SetBreakpoint]),
+        new("Acknowledge", [AcknowledgeDecision]),
         new("HUD", [ToggleHud]),
         new("Report", [FailureReport]),
         new("Quit", [Quit]),

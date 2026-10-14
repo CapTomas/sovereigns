@@ -1,9 +1,19 @@
 {
   "id": "core:scenario/empty_world",
-  "description": "Seeded empty world for Phase 01: world frame, clock, commands, logging and the inspection shell. No terrain or other physical fields exist yet.",
+  "description": "Seeded empty world: world frame, geographic placement, calendar and clock, kernel, commands, logging and the inspection shell. No terrain or other physical fields exist yet.",
   "extent_m": {
     "east": 100000,
     "north": 100000
+  },
+  "geography": {
+    "south_edge_latitude_deg": 47.5,
+    "standard_meridian_east_m": 50000
+  },
+  "start": {
+    "year": 1203,
+    "month": 3,
+    "day": 1,
+    "hour": 6
   },
   "step_ms": 1000,
   "duration_ms": 3600000

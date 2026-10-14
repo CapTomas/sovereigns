@@ -7,8 +7,8 @@ namespace Sovereigns.Simulation.Scenarios;
 /// <summary>Raised when a fixture, scenario or seed selection cannot be honored; the message says how to fix it.</summary>
 public sealed class LaunchException(string message) : Exception(message);
 
-/// <summary>The scenario and seed a host will run, and the fixture that pinned them, if any.</summary>
-public sealed record LaunchSelection(ScenarioDefinition Scenario, ulong Seed, string? FixtureReference)
+/// <summary>The scenario and seed a host will run, the fixture that pinned them, and the fixture's command journal path.</summary>
+public sealed record LaunchSelection(ScenarioDefinition Scenario, ulong Seed, string? FixtureReference, string? CommandsPath = null)
 {
     /// <summary>Scenario used when a host is started without a selection.</summary>
     public static readonly ContentId DefaultScenario = ContentId.Parse("core:scenario/empty_world");
@@ -38,7 +38,8 @@ public sealed record LaunchSelection(ScenarioDefinition Scenario, ulong Seed, st
                 throw new LaunchException($"fixture {manifest.Reference} scenario '{manifest.Scenario}' is not a content/<namespace>/scenario/<name>.json path");
             }
 
-            return new(GetScenario(catalog, fixtureScenario.ToString()), manifest.Seed!.Value, manifest.Reference);
+            return new(GetScenario(catalog, fixtureScenario.ToString()), manifest.Seed!.Value, manifest.Reference,
+                manifest.Commands is null ? null : Path.Combine(repositoryRoot, manifest.Commands));
         }
 
         if (scenario is null && seed is not null)

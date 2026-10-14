@@ -2,7 +2,11 @@ using Sovereigns.Simulation.Diagnostics;
 
 namespace Sovereigns.Client.Diagnostics;
 
-/// <summary>Sends log records to Godot's output: Print for information, PushWarning and PushError above that.</summary>
+/// <summary>
+/// Sends log records to Godot's output. Information and warnings print as plain lines; the text already says
+/// "[WARNING]", and a C# backtrace adds nothing to an expected warning such as a rejected command. Errors use
+/// PushError, so they keep their backtrace and appear in the editor's debugger.
+/// </summary>
 public sealed class GodotLogSink : ILogSink
 {
     public void Write(LogRecord record)
@@ -12,7 +16,7 @@ public sealed class GodotLogSink : ILogSink
         switch (record.Severity)
         {
             case LogSeverity.Warning:
-                GD.PushWarning(text);
+                GD.PrintErr(text);
                 break;
             case >= LogSeverity.Error:
                 GD.PushError(text);

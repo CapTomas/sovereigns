@@ -1,0 +1,9 @@
+{"sequence":1,"at":37902232800000,"command":{"type":"place_marker","position":{"x":20000,"y":30000},"label":"camp"}}
+{"sequence":2,"at":37902236400000,"command":{"type":"place_marker","position":{"x":61000,"y":47000},"label":"ford"}}
+{"sequence":3,"at":37903096800000,"command":{"type":"set_breakpoint","at":37903960800000,"label":"muster"}}
+{"sequence":4,"at":37903960800000,"command":{"type":"acknowledge_decision","decision":6}}
+{"sequence":5,"at":37906120800000,"command":{"type":"remove_marker","marker":1}}
+{"sequence":6,"at":37906120800000,"command":{"type":"place_marker","position":{"x":25000,"y":28000},"label":"winter camp"}}
+{"sequence":7,"at":37919512800000,"command":{"type":"set_breakpoint","at":37923832800000,"label":"harvest check"}}
+{"sequence":8,"at":37923832800000,"command":{"type":"acknowledge_decision","decision":14}}
+{"sequence":9,"at":37928152800000,"command":{"type":"place_marker","position":{"x":50000,"y":50000},"label":"bridge"}}

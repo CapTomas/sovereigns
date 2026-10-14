@@ -1,5 +1,6 @@
 using System.Globalization;
 using Sovereigns.Simulation.Geometry;
+using Sovereigns.Simulation.Kernel;
 using Sovereigns.Simulation.Scenarios;
 
 namespace Sovereigns.Client.Boot;
@@ -12,11 +13,14 @@ public sealed record LaunchArguments
 {
     public const string Usage =
         "Options: --fixture <F-ID|path> | --scenario <content-id> --seed <n>; --content <dir>; --log <file.jsonl>; " +
-        "--reports <dir>; --bindings <file.json>; --record <journal.jsonl>; --capture <file.png>; --capture-frame <n>; --fail-at-ms <ms>; " +
-        "--select <x,y>; --marker <x,y>; --layer <name>";
+        "--reports <dir>; --bindings <file.json>; --record <journal.jsonl>; --capture <file.png>; --capture-frame <n>; --fail-after-ms <ms>; " +
+        "--select <x,y>; --marker <x,y>; --layer <name>; --paused; --speed <1-5>";
 
     private static readonly string[] OptionNames =
-        ["fixture", "scenario", "seed", "content", "log", "reports", "bindings", "record", "capture", "capture-frame", "fail-at-ms", "select", "marker", "layer"];
+        ["fixture", "scenario", "seed", "content", "log", "reports", "bindings", "record", "capture", "capture-frame", "fail-after-ms", "select", "marker", "layer", "speed"];
+
+    /// <summary>Options that stand alone, without a value.</summary>
+    private static readonly string[] FlagNames = ["paused"];
 
     private static string[]? s_injected;
 
@@ -46,8 +50,14 @@ public sealed record LaunchArguments
     /// <summary>Rendered frame after which <see cref="CapturePath"/> is saved; defaults to 10.</summary>
     public int CaptureFrame { get; init; } = 10;
 
-    /// <summary>Simulation time at which to inject a failure, to exercise failure reporting.</summary>
-    public long? FailAtMs { get; init; }
+    /// <summary>Milliseconds after the world's start at which to inject a failure, to exercise failure reporting.</summary>
+    public long? FailAfterMs { get; init; }
+
+    /// <summary>Start with time paused: the client submits a Pause command at startup.</summary>
+    public bool Paused { get; init; }
+
+    /// <summary>Speed preset number, 1 to 5, to select at startup with a SetSpeed command.</summary>
+    public int? Speed { get; init; }
 
     /// <summary>World location to select at startup.</summary>
     public WorldPoint? Select { get; init; }
@@ -81,6 +91,16 @@ public sealed record LaunchArguments
         {
             var option = enumerator.Current;
             var name = option.StartsWith("--", StringComparison.Ordinal) ? option[2..] : "";
+            if (FlagNames.Contains(name))
+            {
+                if (!values.TryAdd(name, "true"))
+                {
+                    throw new LaunchException($"{option} given twice");
+                }
+
+                continue;
+            }
+
             if (!OptionNames.Contains(name))
             {
                 throw new LaunchException($"unknown launch argument '{option}'. {Usage}");
@@ -110,7 +130,9 @@ public sealed record LaunchArguments
             CapturePath = values.GetValueOrDefault("capture"),
             Layer = values.GetValueOrDefault("layer"),
             CaptureFrame = values.TryGetValue("capture-frame", out var frame) ? ParseCaptureFrame(frame) : 10,
-            FailAtMs = values.TryGetValue("fail-at-ms", out var failAt) ? ParseFailAt(failAt) : null,
+            FailAfterMs = values.TryGetValue("fail-after-ms", out var failAfter) ? ParseFailAfter(failAfter) : null,
+            Paused = values.ContainsKey("paused"),
+            Speed = values.TryGetValue("speed", out var speed) ? ParseSpeed(speed) : null,
             Select = values.TryGetValue("select", out var select) ? ParsePoint("--select", select) : null,
             Marker = values.TryGetValue("marker", out var marker) ? ParsePoint("--marker", marker) : null,
         };
@@ -121,10 +143,15 @@ public sealed record LaunchArguments
             ? value
             : throw new LaunchException($"--capture-frame must be a positive whole number of frames, found '{text}'");
 
-    private static long ParseFailAt(string text) =>
+    private static long ParseFailAfter(string text) =>
         long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value)
             ? value
-            : throw new LaunchException($"--fail-at-ms must be a non-negative whole number of milliseconds, found '{text}'");
+            : throw new LaunchException($"--fail-after-ms must be a non-negative whole number of milliseconds, found '{text}'");
+
+    private static int ParseSpeed(string text) =>
+        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) && value >= 1 && value <= TimeControl.Presets.Count
+            ? value
+            : throw new LaunchException($"--speed must be a preset number from 1 to {TimeControl.Presets.Count} (1 s, 1 min, 1 h, 1 day, 1 week per real second), found '{text}'");
 
     private static WorldPoint ParsePoint(string option, string text)
     {

@@ -30,12 +30,12 @@ public sealed record HostInputEvent(long Frame, double RealSeconds, string Actio
 /// command journal, recent host inputs and recent log records.
 /// </summary>
 /// <remarks>
-/// Replaying <see cref="Commands"/> to <see cref="SimTimeMs"/> rebuilds the state before the failure. When
-/// <see cref="FailedInStep"/> is true, a step threw part-way: the state is partial, so <see cref="StateChecksum"/>
-/// is null, <see cref="Commands"/> holds only completed steps, and <see cref="PendingCommands"/> holds every input
-/// of the failing step. Submitting them and stepping once reproduces the failure. Otherwise
-/// <see cref="PendingCommands"/> are commands queued for the next step. Null members are written explicitly
-/// so that every report reads back.
+/// Replaying <see cref="Commands"/> to <see cref="SimTimeMs"/>, from the scenario or from the save with
+/// <see cref="BaseSaveSha256"/>, rebuilds the state before the failure. When
+/// <see cref="FailedDuring"/> is set, an exception left the state partly updated, so <see cref="StateChecksum"/> is
+/// null. Reproduce a <see cref="FaultStage.Command"/> failure by submitting <see cref="FailingCommand"/>, and a
+/// <see cref="FaultStage.Step"/> failure by stepping once. Null members are written explicitly so that every
+/// report reads back.
 /// </remarks>
 public sealed record FailureReport(
     int Format,
@@ -43,28 +43,26 @@ public sealed record FailureReport(
     string Reason,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Exception,
     BuildInfo Build,
+    string WorldId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? BaseSaveSha256,
     ulong Seed,
     string Scenario,
     long SimTimeMs,
-    bool FailedInStep,
+    FaultStage FailedDuring,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] SimCommand? FailingCommand,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? StateChecksum,
     IReadOnlyList<JournalEntry> Commands,
-    IReadOnlyList<SimCommand> PendingCommands,
     IReadOnlyList<HostInputEvent> Inputs,
     IReadOnlyList<LogRecord> RecentLog)
 {
-    public const int CurrentFormat = 1;
+    public const int CurrentFormat = 2;
 
     public static FailureReport Capture(World world, string host, string reason, Exception? exception, BuildInfo build,
         RecentLogBuffer? recentLog = null, IReadOnlyList<HostInputEvent>? inputs = null)
     {
         ArgumentNullException.ThrowIfNull(world);
-        var failedInStep = world.StepInProgress;
-        var journal = world.Journal.Entries;
-        var completed = failedInStep ? journal.Where(entry => entry.At < world.Now).ToList() : [.. journal];
-        var failingStep = failedInStep ? journal.Where(entry => entry.At == world.Now).Select(entry => entry.Command) : [];
         string? checksum = null;
-        if (!failedInStep)
+        if (world.Fault == FaultStage.None)
         {
             try
             {
@@ -78,11 +76,10 @@ public sealed record FailureReport(
             }
         }
 
-        return new(CurrentFormat, host, reason, exception?.ToString(), build, world.Seed, world.ScenarioId.ToString(),
-            world.Now.Milliseconds, failedInStep, checksum, completed, [.. failingStep, .. world.UnappliedCommands],
-            inputs ?? [], recentLog?.Snapshot() ?? []);
+        return new(CurrentFormat, host, reason, exception?.ToString(), build, world.Identity.Id.ToString(), world.BaseSaveSha256, world.Seed,
+            world.ScenarioId.ToString(), world.Now.Milliseconds, world.Fault, world.FaultingCommand, checksum,
+            [.. world.Journal.Entries], inputs ?? [], recentLog?.Snapshot() ?? []);
     }
-
     /// <summary>A file name that sorts by seed and simulation time.</summary>
     [JsonIgnore]
     public string FileName => $"failure-seed{Seed}-t{SimTimeMs}ms.json";

@@ -52,7 +52,7 @@ public partial class InspectorPanel : PanelContainer
     {
         Current = inspection;
         Lines = InspectorContent.Build(inspection, markerRadiusM);
-        _time.Text = $"Queried at simulation time {inspection.At.ToElapsedString()} ({inspection.At.Milliseconds} ms)";
+        _time.Text = $"Queried at {ClockText.Date(inspection.At)} (world standard time)";
         Render();
     }
 

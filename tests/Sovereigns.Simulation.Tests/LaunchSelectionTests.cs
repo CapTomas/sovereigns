@@ -16,7 +16,7 @@ public sealed class LaunchSelectionTests
     {
         var selection = Resolve(fixture: "F-EMPTY");
 
-        Assert.Equal("F-EMPTY@1", selection.FixtureReference);
+        Assert.Equal("F-EMPTY@2", selection.FixtureReference);
         Assert.Equal(20261009UL, selection.Seed);
         Assert.Equal(LaunchSelection.DefaultScenario, selection.Scenario.Id);
     }

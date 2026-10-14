@@ -14,15 +14,15 @@ public sealed class LoggingTests
         var world = World.Create(TestSupport.Scenario(), seed: 31, new Logger([sink], LogSeverity.Debug));
         world.AdvanceTo(new Time.SimTime(2_000));
         world.Submit(new PlaceMarker(new WorldPoint(1, 1), "m"));
-        world.Step();
 
-        var created = sink.Records[0];
-        var placed = Assert.Single(sink.Records, record => record.Message == "marker placed");
+        var created = Assert.Single(sink.Records, record => record.Message == "world created");
+        var placed = Assert.Single(sink.Records, record => record.Message == "event MarkerPlaced");
 
         Assert.Equal((LogSeverity.Info, "world", 31UL, 0L), (created.Severity, created.Subsystem, created.WorldSeed, created.SimTimeMs));
         Assert.Equal("test:scenario/plain", created.Data!["scenario"]);
         Assert.Equal((LogSeverity.Debug, 31UL, 2_000L), (placed.Severity, placed.WorldSeed, placed.SimTimeMs));
-        Assert.Equal(["marker:1"], placed.ObjectIds);
+        // event:2 is the calendar's YearBegan, recorded when the clock left 1 January 00:00.
+        Assert.Equal(["event:3", "marker:1"], placed.ObjectIds);
     }
 
     [Fact]
@@ -83,6 +83,6 @@ public sealed class LoggingTests
         var record = new LogRecord(LogSeverity.Warning, "world", "command rejected", 5, 1_000, ["marker:2"],
             new Dictionary<string, string> { ["sequence"] = "3" });
 
-        Assert.Equal("[WARNING] world seed=5 t=1000ms: command rejected [marker:2] {sequence=3}", TextLogSink.Format(record));
+        Assert.Equal("[WARNING] world seed=5 t=0001-01-01T00:00:01.000: command rejected [marker:2] {sequence=3}", TextLogSink.Format(record));
     }
 }

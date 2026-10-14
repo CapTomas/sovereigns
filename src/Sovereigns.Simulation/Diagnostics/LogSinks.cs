@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Sovereigns.Simulation.Serialization;
+using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Simulation.Diagnostics;
 
@@ -37,7 +38,7 @@ public sealed class TextLogSink(TextWriter writer) : ILogSink
 
         if (record.SimTimeMs is { } time)
         {
-            text.Append(CultureInfo.InvariantCulture, $" t={time}ms");
+            text.Append(CultureInfo.InvariantCulture, $" t={WorldCalendar.ToCalendar(new SimTime(time))}");
         }
 
         text.Append(": ").Append(record.Message);

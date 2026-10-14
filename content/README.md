@@ -8,7 +8,7 @@ One JSON object per file at `content/<namespace>/<kind>/<name>.json`. Its `id` m
 
 | Kind | Definition | Purpose |
 |---|---|---|
-| `scenario` | [`ScenarioDefinition`](../src/Sovereigns.Simulation/Scenarios/ScenarioDefinition.cs) | World setup selected by name together with a seed |
+| `scenario` | [`ScenarioDefinition`](../src/Sovereigns.Simulation/Scenarios/ScenarioDefinition.cs) | World setup selected by name together with a seed: `extent_m`, `geography` (`south_edge_latitude_deg`, `standard_meridian_east_m`), `start` (`year`, `month`, `day`, optional `hour` and `minute`), `step_ms` (divides a day) and `duration_ms` ([ADR-0006](../docs/architecture/ADR-0006-world-identity-geography-calendar.md)) |
 
 ## Validation
 

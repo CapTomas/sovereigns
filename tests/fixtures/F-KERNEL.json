@@ -1,0 +1,9 @@
+{
+  "id": "F-KERNEL",
+  "version": 1,
+  "status": "defined",
+  "purpose": "Kernel timeline over 400 days from 15 November 1202: season and year boundaries from the calendar system, markers placed and removed, and two breakpoints that stop time until the journal acknowledges them. Phase 02 determinism, replay and save/load evidence.",
+  "seed": 20261014,
+  "scenario": "content/core/scenario/kernel_year.json",
+  "commands": "tests/fixtures/F-KERNEL.commands.jsonl"
+}

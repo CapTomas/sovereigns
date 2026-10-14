@@ -19,6 +19,8 @@ indent_size = 4
 dotnet_sort_system_directives_first = true
 csharp_style_namespace_declarations = file_scoped:warning
 csharp_new_line_before_open_brace = all
+# C#-only codebase: names that are keywords in other .NET languages (Event, Resume) are fine.
+dotnet_diagnostic.CA1716.severity = none
 
 [*.{csproj,props,targets,slnx,config}]
 indent_style = space

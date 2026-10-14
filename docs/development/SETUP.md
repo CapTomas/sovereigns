@@ -54,10 +54,10 @@ dotnet format Sovereigns.slnx --verify-no-changes --no-restore
 dotnet build Sovereigns.slnx -c Release --no-restore
 dotnet test Sovereigns.slnx -c Release --no-build --logger trx --results-directory artifacts/test-results
 dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- validate-content
-python3 tools/ci/check_determinism.py -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture F-EMPTY
+for fixture in F-EMPTY F-KERNEL; do python3 tools/ci/check_determinism.py -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture "$fixture"; done
 ```
 
-The last command runs the `F-EMPTY` fixture twice and fails if the checksum, simulated time or step count differ. In CI each operating system also saves its result with `--write`. The `determinism` job then compares all three with `check_determinism.py --compare`, which is the cross-platform measurement ADR-0004 §3 asks for. To fix a formatting failure run `dotnet format Sovereigns.slnx` (without `--verify-no-changes`).
+The last command runs each fixture twice and fails if the checksum, simulated time or step count differ. `F-KERNEL` covers 400 days of calendar, command and decision history. In CI each operating system also saves its result with `--write` under `artifacts/determinism/<fixture>/`. The `determinism` job then compares the three operating systems per fixture with `check_determinism.py --compare`, which is the cross-platform measurement ADR-0004 §3 asks for. To fix a formatting failure run `dotnet format Sovereigns.slnx` (without `--verify-no-changes`).
 
 ### Repository documentation checks (the `docs` check)
 
@@ -75,7 +75,7 @@ godot --headless --path game --import
 godot --headless --path game --build-solutions --quit
 python3 tools/ci/run_checked.py --log artifacts/logs/client-tests.log -- godot --headless --path game res://tests/ClientTests.tscn
 python3 tools/ci/run_checked.py --log artifacts/logs/shell-smoke.log \
-  --require "world created" --require "ms: shutdown {" \
+  --require "world created" --require ": shutdown {sim_time_ms=" \
   --forbid "leaked at exit" --forbid "ObjectDB instances leaked" --forbid "still in use at exit" --forbid "ERROR:" \
   -- godot --headless --verbose --path game --quit-after 300 -- --fixture F-EMPTY
 ```
@@ -92,7 +92,7 @@ python3 tools/ci/run_checked.py --log artifacts/logs/export.log \
   -- godot --headless --path game --export-release "Linux" "$PWD/artifacts/package/linux/sovereigns.x86_64"
 cp -R content artifacts/package/linux/content
 python3 tools/ci/write_notices.py artifacts/package/linux/THIRD-PARTY-NOTICES.txt
-python3 tools/ci/run_checked.py --log artifacts/logs/package-smoke.log --require "world created" --require "ms: shutdown {" --forbid "ERROR:" \
+python3 tools/ci/run_checked.py --log artifacts/logs/package-smoke.log --require "world created" --require ": shutdown {sim_time_ms=" --forbid "ERROR:" \
   -- artifacts/package/linux/sovereigns.x86_64 --headless --quit-after 120 -- --scenario core:scenario/empty_world --seed 20261009
 ```
 
@@ -114,7 +114,7 @@ When a CI job fails or finishes, it uploads `artifacts/` as a GitHub Actions art
 To rehearse the failure path, inject a failure and replay the report it writes:
 
 ```bash
-dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture F-EMPTY --fail-at-ms 60000
+dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture F-EMPTY --fail-after-ms 60000
 dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- replay artifacts/reports/<report file>.json
 ```
 

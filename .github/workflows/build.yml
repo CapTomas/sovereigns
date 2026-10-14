@@ -55,7 +55,10 @@ jobs:
       - name: Validate content
         run: dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- validate-content
       - name: Check fixture determinism
-        run: python tools/ci/check_determinism.py --write artifacts/determinism/${{ matrix.os }}.json -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture F-EMPTY
+        run: |
+          for fixture in F-EMPTY F-KERNEL; do
+            python tools/ci/check_determinism.py --write "artifacts/determinism/$fixture/${{ matrix.os }}.json" -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture "$fixture"
+          done
       - name: Upload test results and failure reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -119,7 +122,7 @@ jobs:
         timeout-minutes: 5
         run: >-
           python3 tools/ci/run_checked.py --log artifacts/logs/shell-smoke.log --timeout 120
-          --require "world created" --require "ms: shutdown {"
+          --require "world created" --require ": shutdown {sim_time_ms="
           --forbid "leaked at exit" --forbid "ObjectDB instances leaked" --forbid "still in use at exit" --forbid "ERROR:"
           -- godot --headless --verbose --path game --quit-after 300 -- --fixture F-EMPTY
       - name: Upload logs and failure reports
@@ -175,7 +178,7 @@ jobs:
         timeout-minutes: 5
         run: >-
           python3 tools/ci/run_checked.py --log artifacts/logs/package-smoke.log --timeout 120
-          --require "world created" --require "ms: shutdown {" --forbid "ERROR:"
+          --require "world created" --require ": shutdown {sim_time_ms=" --forbid "ERROR:"
           -- artifacts/package/linux/sovereigns.x86_64 --headless --quit-after 120 -- --scenario core:scenario/empty_world --seed 20261009
       - name: Upload package
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -15,11 +15,17 @@ public sealed class CommandJournal
 {
     private readonly List<JournalEntry> _entries = [];
 
+    /// <summary>Commands applied before this journal began, for a world loaded from a save; sequences continue after it.</summary>
+    public long PriorCount { get; internal set; }
+
     public IReadOnlyList<JournalEntry> Entries => _entries;
+
+    /// <summary>Sequence number the next command will receive.</summary>
+    public long NextSequence => PriorCount + _entries.Count + 1;
 
     internal JournalEntry Append(SimTime at, SimCommand command, string? rejection)
     {
-        var entry = new JournalEntry(_entries.Count + 1, at, command, rejection);
+        var entry = new JournalEntry(NextSequence, at, command, rejection);
         _entries.Add(entry);
         return entry;
     }
@@ -66,9 +72,10 @@ public sealed class CommandJournal
                 throw new FormatException($"{source}:{lineNumber}: journal entry is null");
             }
 
-            if (entry.Sequence != entries.Count + 1)
+            var expected = entries.Count == 0 ? Math.Max(1, entry.Sequence) : entries[^1].Sequence + 1;
+            if (entry.Sequence != expected)
             {
-                throw new FormatException($"{source}:{lineNumber}: expected sequence {entries.Count + 1}, found {entry.Sequence}");
+                throw new FormatException($"{source}:{lineNumber}: expected sequence {expected}, found {entry.Sequence}");
             }
 
             if (entries.Count > 0 && entry.At < entries[^1].At)

@@ -3,35 +3,38 @@ using Sovereigns.Client.Diagnostics;
 using Sovereigns.Simulation;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Diagnostics;
+using Sovereigns.Simulation.Kernel;
+using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Client.Simulation;
 
 /// <summary>Why the host stopped advancing and where the evidence is.</summary>
 public sealed record HostFailure(string Reason, string? ReportPath, string ReplayCommand);
 
-/// <summary>Deliberate failure requested with <c>--fail-at-ms</c>, used to exercise failure reporting.</summary>
+/// <summary>Deliberate failure requested with <c>--fail-after-ms</c>, used to exercise failure reporting.</summary>
 public sealed class InjectedFailureException(string message) : Exception(message);
 
 /// <summary>
-/// Owns the one authoritative <see cref="World"/> in the client and feeds it fixed steps at real-time pace
-/// (one simulated second per real second). The rendering clock only decides how many whole steps are due;
-/// the world never sees frame deltas, so any frame pacing reaches the same state at the same simulation time.
-/// This class has no Godot types so it can be exercised with scripted frame deltas.
+/// Owns the one authoritative <see cref="World"/> in the client and paces it with the kernel's
+/// <see cref="RealTimePacer"/> at the world's <see cref="TimeControl"/> speed (SOV-P02-T11). The rendering clock
+/// only decides how far the world advances per frame; the world never sees frame deltas, so any frame pacing,
+/// pause pattern or speed reaches the same state at the same simulation time (SOV-P02-T16). A fixture's command
+/// stream is submitted when the world's time reaches each entry, as the headless runner does. This class has no
+/// Godot types so it can be exercised with scripted frame deltas.
 /// </summary>
 public sealed class SimulationHost
 {
-    public const int MaxStepsPerFrame = 10;
-
-    private const long MicrosecondsPerSecond = 1_000_000;
-
+    private readonly RealTimePacer _pacer = new();
     private readonly SubsystemLog _log;
     private readonly FailureReporter _reporter;
-    private readonly long? _failAtMs;
-    private readonly long _stepMicroseconds;
-    private long _owedMicroseconds;
+    private readonly SimTime? _failAt;
+    private readonly IReadOnlyList<JournalEntry> _script;
+    private int _nextScripted;
     private bool _backlogWarned;
 
-    public SimulationHost(World world, Logger logger, FailureReporter reporter, long? failAtMs = null)
+    /// <param name="failAfterMs">Milliseconds after the world's current time at which to inject a failure, rounded up to the step grid.</param>
+    /// <param name="script">Commands to submit when the world's time reaches each entry's time, in time order.</param>
+    public SimulationHost(World world, Logger logger, FailureReporter reporter, long? failAfterMs = null, IReadOnlyList<JournalEntry>? script = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(logger);
@@ -39,39 +42,48 @@ public sealed class SimulationHost
         World = world;
         _log = logger.For("client.sim", world);
         _reporter = reporter;
-        _failAtMs = failAtMs;
-        _stepMicroseconds = world.StepMs * 1000;
+        _failAt = failAfterMs is { } after ? world.Now.Plus((Math.Max(0, after) + world.StepMs - 1) / world.StepMs * world.StepMs) : null;
+        _script = script ?? [];
     }
 
     public World World { get; }
 
-    /// <summary>Set when stepping or command submission threw; the host then stops advancing.</summary>
+    /// <summary>Set when advancing or command submission threw; the host then stops advancing.</summary>
     public HostFailure? Failure { get; private set; }
 
-    /// <summary>Wall-clock cost of the most recent <see cref="World.Step"/>, in milliseconds.</summary>
-    public double LastStepCostMs { get; private set; }
+    /// <summary>Wall-clock cost, in milliseconds, of the most recent <see cref="Advance"/> that moved the clock.</summary>
+    public double LastAdvanceCostMs { get; private set; }
 
-    /// <summary>Accepts real elapsed seconds and runs every whole simulation step that is now due, up to <see cref="MaxStepsPerFrame"/>.</summary>
-    public void Advance(double realDeltaSeconds)
+    /// <summary>Steps taken by the most recent <see cref="Advance"/> that moved the clock.</summary>
+    public long LastAdvanceSteps { get; private set; }
+
+    /// <summary>Fixture commands not yet submitted because the world's time has not reached them.</summary>
+    public int ScriptedCommandsRemaining => _script.Count - _nextScripted;
+
+    /// <summary>
+    /// Accepts real elapsed seconds and advances the world as its time control allows. The world stops at the next
+    /// scripted command, at a pending decision, and never passes <paramref name="limit"/> (for example a fixed end time).
+    /// </summary>
+    public void Advance(double realDeltaSeconds, SimTime? limit = null)
     {
-        if (Failure is not null || !double.IsFinite(realDeltaSeconds) || realDeltaSeconds <= 0)
+        if (Failure is not null)
         {
             return;
         }
 
-        // Whole microseconds keep the pacing exact; summing binary fractions of a second would drift.
-        _owedMicroseconds += (long)Math.Round(realDeltaSeconds * MicrosecondsPerSecond);
-        var steps = 0;
+        var started = Stopwatch.GetTimestamp();
+        var before = World.Now;
         try
         {
-            while (_owedMicroseconds >= _stepMicroseconds && steps < MaxStepsPerFrame)
+            SubmitDueScript();
+            _pacer.Advance(World, realDeltaSeconds, Earliest(limit, _failAt, _nextScripted < _script.Count ? _script[_nextScripted].At : null));
+            SubmitDueScript();
+            if (_failAt is { } failAt && World.Now >= failAt)
             {
-                StepOnce();
-                _owedMicroseconds -= _stepMicroseconds;
-                steps++;
+                throw new InjectedFailureException($"failure injected by --fail-after-ms at {World.Now}");
             }
         }
-#pragma warning disable CA1031 // Any stepping failure becomes a failure report and an on-screen banner.
+#pragma warning disable CA1031 // Any advancing failure becomes a failure report and an on-screen banner.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
@@ -79,53 +91,80 @@ public sealed class SimulationHost
             return;
         }
 
-        if (_owedMicroseconds >= _stepMicroseconds)
+        var steps = (World.Now.Milliseconds - before.Milliseconds) / World.StepMs;
+        if (steps > 0)
         {
-            var droppedSeconds = _owedMicroseconds / _stepMicroseconds * World.StepMs / 1000.0;
-            _owedMicroseconds %= _stepMicroseconds;
-            if (!_backlogWarned)
-            {
-                _backlogWarned = true;
-                _log.Warning($"frame hitch: dropped {droppedSeconds:0.###} s of simulation backlog (limit {MaxStepsPerFrame} steps per frame); further drops are not logged");
-            }
+            LastAdvanceSteps = steps;
+            LastAdvanceCostMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        }
+
+        if (_pacer.DroppedBacklogCount > 0 && !_backlogWarned)
+        {
+            _backlogWarned = true;
+            _log.Warning($"frame hitch: dropped simulation backlog (the kernel catches up on at most {RealTimePacer.MaxBacklogRealSeconds} s of real time per frame); further drops are not logged");
         }
     }
 
-    /// <summary>Queues a command with the world; false when the host has already failed or submission threw.</summary>
-    public bool TrySubmit(SimCommand command)
+    /// <summary>Applies a world command now and returns its journal entry; null when the host has already failed or submission threw.</summary>
+    public JournalEntry? TrySubmit(SimCommand command)
     {
+        ArgumentNullException.ThrowIfNull(command);
         if (Failure is not null)
         {
-            return false;
+            return null;
         }
 
         try
         {
-            World.Submit(command);
-            return true;
+            return World.Submit(command);
         }
 #pragma warning disable CA1031 // Any submission failure becomes a failure report and an on-screen banner.
         catch (Exception ex)
 #pragma warning restore CA1031
         {
             Fail("command submission failed", ex);
-            return false;
+            return null;
         }
+    }
+
+    /// <summary>Applies a pacing command to the world's time control; null when applied, else why it was refused.</summary>
+    public string? TryControl(ControlCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return Failure is null ? World.Control(command) : "the simulation has stopped";
     }
 
     /// <summary>Writes a report of the current state without stopping the host; null when it could not be written.</summary>
     public string? WriteReport(string reason, Exception? exception = null) => _reporter.TryWrite(World, reason, exception);
 
-    private void StepOnce()
+    private static SimTime? Earliest(params SimTime?[] times)
     {
-        if (_failAtMs is { } failAt && World.Now.Milliseconds >= failAt)
+        SimTime? earliest = null;
+        foreach (var time in times)
         {
-            throw new InjectedFailureException($"failure injected by --fail-at-ms at {World.Now}");
+            if (time is { } candidate && (earliest is null || candidate < earliest.Value))
+            {
+                earliest = candidate;
+            }
         }
 
-        var started = Stopwatch.GetTimestamp();
-        World.Step();
-        LastStepCostMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        return earliest;
+    }
+
+    private void SubmitDueScript()
+    {
+        while (_nextScripted < _script.Count && _script[_nextScripted].At <= World.Now)
+        {
+            var command = _script[_nextScripted++].Command;
+            if (command is ControlCommand control)
+            {
+                World.Control(control);
+            }
+            else
+            {
+                World.Submit(command);
+            }
+        }
     }
 
     private void Fail(string reason, Exception exception)

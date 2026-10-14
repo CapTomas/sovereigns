@@ -1,5 +1,6 @@
 using System.Globalization;
 using Sovereigns.Simulation.Geometry;
+using Sovereigns.Simulation.Kernel;
 using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Client.Ui;
@@ -10,13 +11,21 @@ public sealed record DebugHudModel(
     string? FixtureReference,
     string ScenarioId,
     SimTime Now,
+    Hemisphere Hemisphere,
     long StepCount,
     long StepMs,
+    bool Paused,
+    long SimMillisecondsPerRealSecond,
+    int RequestedSteps,
+    IReadOnlyList<PendingDecision> Decisions,
+    string AcknowledgeKey,
+    int LedgerEvents,
     WorldPoint CameraCentre,
     double MetresPerPixel,
     double Fps,
     double FrameMs,
-    double LastStepCostMs,
+    double LastAdvanceCostMs,
+    long LastAdvanceSteps,
     long ManagedHeapBytes,
     long GodotStaticBytes,
     int OrphanNodes,
@@ -24,12 +33,11 @@ public sealed record DebugHudModel(
     int ErrorCount,
     string? LastWarning,
     int JournalEntries,
-    int PendingCommands,
     string Checksum,
     string BuildConfiguration,
     bool Failed);
 
-/// <summary>A translucent overlay of seed, clock, camera, frame, memory, log and journal state.</summary>
+/// <summary>A translucent overlay of seed, date, time control, camera, frame, memory, log and journal state.</summary>
 public partial class DebugHud : PanelContainer
 {
     private Label _label = null!;
@@ -57,21 +65,49 @@ public partial class DebugHud : PanelContainer
             "DEBUG HUD (F3 to hide)",
             F($"seed: {model.Seed}   fixture: {model.FixtureReference ?? "none"}"),
             F($"scenario: {model.ScenarioId}"),
-            F($"sim time: {model.Now.ToElapsedString()} ({model.Now.Milliseconds} ms){(model.Failed ? "  STOPPED" : "")}"),
-            F($"steps: {model.StepCount}   step size: {model.StepMs} ms   real-time pace 1x"),
-            "time controls: SOV-P02-T11",
+            F($"date: {ClockText.Date(model.Now)}  (world standard time)"),
+            F($"season: {ClockText.Season(model.Now, model.Hemisphere)}"),
+            F($"time: {TimeState(model)}"),
+            F($"steps: {model.StepCount}   step size: {model.StepMs} ms   ledger events: {model.LedgerEvents}"),
+        };
+        if (model.Decisions.Count == 0)
+        {
+            lines.Add("pending decisions: none");
+        }
+        else
+        {
+            lines.AddRange(model.Decisions.Take(3).Select(decision =>
+                F($"DECISION PENDING: {decision.Label} (raised {ClockText.Date(decision.At)}) — {model.AcknowledgeKey} to acknowledge")));
+            if (model.Decisions.Count > 3)
+            {
+                lines.Add(F($"  and {model.Decisions.Count - 3} more"));
+            }
+        }
+
+        lines.AddRange(
+        [
             "active world chunk: unavailable — chunking arrives with SOV-P03-T07",
             F($"camera centre: {model.CameraCentre}   {model.MetresPerPixel:0.###} m/px"),
-            F($"fps: {model.Fps:0}   frame: {model.FrameMs:0.0} ms   last sim step: {model.LastStepCostMs:0.000} ms"),
+            F($"fps: {model.Fps:0}   frame: {model.FrameMs:0.0} ms   advance: {model.LastAdvanceCostMs:0.000} ms/{model.LastAdvanceSteps} step(s)"),
             F($"managed heap: {Megabytes(model.ManagedHeapBytes)}   godot static: {Megabytes(model.GodotStaticBytes)}"),
             F($"orphan nodes: {model.OrphanNodes}"),
             F($"log warnings: {model.WarningCount}   errors: {model.ErrorCount}"),
             F($"last warning/error: {model.LastWarning ?? "none"}"),
-            F($"journal entries: {model.JournalEntries}   pending commands: {model.PendingCommands}"),
+            F($"journal entries: {model.JournalEntries}"),
             F($"state checksum: {model.Checksum}"),
             F($"build: {model.BuildConfiguration}"),
-        };
+        ]);
         return string.Join('\n', lines);
+    }
+
+    private static string TimeState(DebugHudModel model)
+    {
+        var speed = ClockText.Speed(model.SimMillisecondsPerRealSecond);
+        var state = model.Failed ? "STOPPED by a failure"
+            : model.Decisions.Count > 0 ? $"STOPPED by a pending decision (speed {speed})"
+            : model.Paused ? $"PAUSED (speed {speed})"
+            : $"running at {speed}";
+        return model.RequestedSteps > 0 ? string.Create(CultureInfo.InvariantCulture, $"{state}; {model.RequestedSteps} step(s) requested") : state;
     }
 
     private static string Megabytes(long bytes) => string.Create(CultureInfo.InvariantCulture, $"{bytes / 1048576.0:0.0} MiB");

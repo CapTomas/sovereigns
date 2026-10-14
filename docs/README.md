@@ -2,7 +2,7 @@
 
 - [`spec/README.md`](spec/README.md) — authoritative game behavior, divided into 39 chapters.
 - [`architecture/SYSTEM_MAP.md`](architecture/SYSTEM_MAP.md) — module ownership, data flow and boundaries.
-- [`architecture/README.md`](architecture/README.md) — ADR index: runtime, authority, platforms, units/coordinates/time/IDs, toolchain pins and layout.
+- [`architecture/README.md`](architecture/README.md) — ADR index: runtime, authority, platforms, units/coordinates/time/IDs, toolchain pins and layout, world identity and calendar, simulation kernel, saves.
 - [`development/SETUP.md`](development/SETUP.md) — bootstrap, build, test and run commands; [`development/DIAGNOSTICS.md`](development/DIAGNOSTICS.md) — logs, failure reports, replay and leak checks.
 - [`legal/README.md`](legal/README.md) — third-party license and attribution tracking.
 - [`agents/README.md`](agents/README.md) — compact map of shared Codex and Claude Code working instructions.

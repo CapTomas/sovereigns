@@ -132,7 +132,7 @@ public partial class Main : Node
         var build = BuildInfo.Describe(Assembly.GetExecutingAssembly());
         var worldLog = _logging.Logger.For("client", world);
         var reporter = new FailureReporter(_paths.ReportsDirectory, _paths.RepositoryRoot, worldLog, build, _logging.Recent, Inputs);
-        Host = new SimulationHost(world, _logging.Logger, reporter, arguments.FailAtMs);
+        Host = new SimulationHost(world, _logging.Logger, reporter, arguments.FailAfterMs, Launch.Script);
         worldLog.Info($"running {world.ScenarioId} with seed {world.Seed}{(Launch.Selection!.FixtureReference is { } fixture ? $" (fixture {fixture})" : "")}");
 
         Shell = new InspectionShell(new ShellContext(Host, Launch.Selection, arguments, Bindings, Inputs, _logging.Recent, worldLog, build));

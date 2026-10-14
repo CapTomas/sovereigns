@@ -1,6 +1,6 @@
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Geometry;
-using Sovereigns.Simulation.Markers;
+using Sovereigns.Simulation.Ids;
 using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Simulation.Tests;
@@ -15,9 +15,11 @@ public sealed class ReplayTests
         original.AdvanceTo(new SimTime(1_000));
         original.Submit(new PlaceMarker(new WorldPoint(100.25, 200.5), "a"));
         original.Submit(new PlaceMarker(new WorldPoint(50_000, 1), "rejected: outside"));
-        original.Step();
+        original.Submit(new SetBreakpoint(new SimTime(3_000), "check"));
         original.AdvanceTo(new SimTime(4_000));
-        original.Submit(new RemoveMarker(new MarkerId(1)));
+        original.Submit(new AcknowledgeDecision(original.PendingDecisions[0].Event));
+        original.AdvanceTo(new SimTime(4_000));
+        original.Submit(new RemoveMarker(new EntityId<Kind.Marker>(1)));
         original.Submit(new PlaceMarker(new WorldPoint(7, 8), "b"));
         original.AdvanceTo(new SimTime(10_000));
 
@@ -26,6 +28,7 @@ public sealed class ReplayTests
         var journal = CommandJournal.ReadJsonLines(new StringReader(text.ToString()), "memory");
         var replayed = Replay.Run(scenario, 99, journal, original.Now);
 
+        Assert.Equal(new SimTime(10_000), original.Now);
         Assert.Equal(original.Journal.Entries, journal);
         Assert.Equal(original.ComputeChecksum(), replayed.ComputeChecksum());
         Assert.Equal(original.Journal.Entries, replayed.Journal.Entries);
@@ -36,7 +39,6 @@ public sealed class ReplayTests
     {
         var world = World.Create(TestSupport.Scenario(), seed: 1);
         world.Submit(new PlaceMarker(new WorldPoint(1.5, 2), "x"));
-        world.Step();
         using var text = new StringWriter();
 
         CommandJournal.WriteJsonLines(world.Journal.Entries, text);
@@ -45,7 +47,7 @@ public sealed class ReplayTests
     }
 
     [Theory]
-    [InlineData("""{"sequence":2,"at":0,"command":{"type":"remove_marker","marker":1}}""", "expected sequence 1")]
+    [InlineData("""{"sequence":0,"at":0,"command":{"type":"remove_marker","marker":1}}""", "expected sequence 1")]
     [InlineData("""{"sequence":1,"at":0,"command":{"type":"teleport"}}""", "invalid journal entry")]
     [InlineData("""{"sequence":1,"at":0}""", "invalid journal entry")]
     [InlineData("not json", "invalid journal entry")]
@@ -88,6 +90,16 @@ public sealed class ReplayTests
     }
 
     [Fact]
+    public void ReplayRefusesControlCommandsInAJournal()
+    {
+        JournalEntry[] journal = [new(1, SimTime.Zero, new Pause())];
+
+        var error = Assert.Throws<InvalidOperationException>(() => Replay.Run(TestSupport.Scenario(), 1, journal, new SimTime(1_000)));
+
+        Assert.Contains("control command", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReplayRefusesAJournalThatDoesNotReproduce()
     {
         var scenario = TestSupport.Scenario();
@@ -103,6 +115,21 @@ public sealed class ReplayTests
     {
         JournalEntry[] journal = [new(1, new SimTime(5_000), new PlaceMarker(new WorldPoint(1, 1), "a"))];
 
-        Assert.Throws<InvalidOperationException>(() => Replay.Run(TestSupport.Scenario(), 1, journal, new SimTime(5_000)));
+        Assert.Throws<InvalidOperationException>(() => Replay.Run(TestSupport.Scenario(), 1, journal, new SimTime(4_000)));
+        Assert.Single(Replay.Run(TestSupport.Scenario(), 1, journal, new SimTime(5_000)).Markers);
+    }
+
+    [Fact]
+    public void ReplayRefusesAJournalThatTimeCannotReachPastAnUnacknowledgedDecision()
+    {
+        JournalEntry[] journal =
+        [
+            new(1, SimTime.Zero, new SetBreakpoint(new SimTime(2_000), "stop")),
+            new(2, new SimTime(5_000), new PlaceMarker(new WorldPoint(1, 1), "never reached")),
+        ];
+
+        var error = Assert.Throws<InvalidOperationException>(() => Replay.Run(TestSupport.Scenario(), 1, journal, new SimTime(6_000)));
+
+        Assert.Contains("pending decision", error.Message, StringComparison.Ordinal);
     }
 }

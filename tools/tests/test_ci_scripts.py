@@ -59,19 +59,25 @@ class Determinism(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             return check_determinism.main(['--',*python(code)])
 
-    def test_compare_requires_identical_summaries_from_every_platform(self):
+    def test_compare_groups_by_fixture_and_requires_agreement(self):
+        def write(directory,fixture,platform,checksum):
+            folder=Path(directory)/f'simulation-{platform}'/'determinism'/fixture
+            folder.mkdir(parents=True,exist_ok=True)
+            (folder/f'{platform}.json').write_text(json.dumps({**self.SUMMARY,'checksum':checksum}),encoding='utf-8')
+        quiet=lambda: (contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()))
         with tempfile.TemporaryDirectory() as directory:
-            for name,checksum in [('ubuntu','abc'),('windows','abc')]:
-                (Path(directory)/name).mkdir()
-                (Path(directory)/name/f'{name}.json').write_text(json.dumps({**self.SUMMARY,'checksum':checksum}),encoding='utf-8')
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(check_determinism.main(['--compare',directory]),0)
-                (Path(directory)/'macos.json').write_text(json.dumps({**self.SUMMARY,'checksum':'zzz'}),encoding='utf-8')
-                self.assertEqual(check_determinism.main(['--compare',directory]),1)
-            (Path(directory)/'ubuntu'/'ubuntu.json').unlink()
-            (Path(directory)/'macos.json').unlink()
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(check_determinism.main(['--compare',directory]),1)
+            for platform in ('ubuntu','windows'):
+                write(directory,'F-EMPTY',platform,'abc')
+                write(directory,'F-KERNEL',platform,'def')
+            out,err=quiet()
+            with out,err: self.assertEqual(check_determinism.main(['--compare',directory]),0)
+            write(directory,'F-KERNEL','macos','zzz')
+            out,err=quiet()
+            with out,err: self.assertEqual(check_determinism.main(['--compare',directory]),1)
+        with tempfile.TemporaryDirectory() as directory:
+            write(directory,'F-EMPTY','ubuntu','abc')
+            out,err=quiet()
+            with out,err: self.assertEqual(check_determinism.main(['--compare',directory]),1)
 
     def test_write_saves_the_compared_fields(self):
         with tempfile.TemporaryDirectory() as directory:

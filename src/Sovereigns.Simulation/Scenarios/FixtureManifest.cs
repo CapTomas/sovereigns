@@ -5,10 +5,11 @@ using Sovereigns.Simulation.Serialization;
 namespace Sovereigns.Simulation.Scenarios;
 
 /// <summary>
-/// A versioned reference fixture from <c>tests/fixtures/</c>. A defined fixture pins a seed and the
-/// repository path of its scenario; evidence cites it as <see cref="Reference"/>.
+/// A versioned reference fixture from <c>tests/fixtures/</c>. A defined fixture pins a seed, the repository path
+/// of its scenario and, optionally, of a command journal that hosts apply as time reaches each entry. Evidence
+/// cites it as <see cref="Reference"/>.
 /// </summary>
-public sealed record FixtureManifest(string Id, int Version, string Status, string Purpose, ulong? Seed, string? Scenario)
+public sealed record FixtureManifest(string Id, int Version, string Status, string Purpose, ulong? Seed, string? Scenario, string? Commands = null)
 {
     [JsonIgnore]
     public string Reference => $"{Id}@{Version}";

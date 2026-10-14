@@ -5,8 +5,9 @@
   check_determinism.py --compare <directory>
 
 The command must print one JSON object on stdout. --write saves the compared fields so that runs on different
-operating systems can be compared afterwards with --compare, which fails unless every *.json file in the
-directory (searched recursively) has identical fields (ADR-0004 §3 cross-platform measurement). Fields such as wall_ms and memory legitimately differ between runs
+operating systems can be compared afterwards with --compare (ADR-0004 §3 cross-platform measurement). Summaries
+are grouped by the name of their directory, one directory per fixture (for example determinism/F-KERNEL/ubuntu.json);
+--compare fails unless every group has at least two summaries and they are identical. Fields such as wall_ms and memory legitimately differ between runs
 and are ignored. When GITHUB_STEP_SUMMARY is set, the checksum is appended there so runners can be compared by eye.
 Exit codes: 0 identical, 1 differing or failing run, 2 usage error.
 """
@@ -39,19 +40,28 @@ def run_once(command):
     return summary_of(done.stdout)
 
 def compare(directory):
-    """Fail unless every saved summary under directory has identical compared fields."""
-    paths=sorted(path for path in __import__('pathlib').Path(directory).rglob('*.json'))
-    if len(paths)<2:
-        print(f'check_determinism: need at least two summaries under {directory}, found {len(paths)}',file=sys.stderr)
+    """Fail unless the saved summaries in each fixture directory agree across platforms."""
+    groups={}
+    # Only per-fixture summaries; failure reports and other JSON in the same artifacts are not summaries.
+    for path in sorted(p for p in __import__('pathlib').Path(directory).rglob('*.json') if p.parent.parent.name=='determinism'):
+        groups.setdefault(path.parent.name,{})[path.stem]=json.loads(path.read_text(encoding='utf-8'))
+    if not groups:
+        print(f'check_determinism: no summaries under {directory}',file=sys.stderr)
         return 1
-    summaries={path.stem:json.loads(path.read_text(encoding='utf-8')) for path in paths}
-    reference_name,reference=next(iter(summaries.items()))
-    problems=[f'{name}: {problem}' for name,summary in summaries.items() for problem in differences(reference,summary)]
-    if problems:
-        print(f'check_determinism: platforms disagree with {reference_name}:\n - '+'\n - '.join(problems),file=sys.stderr)
-        return 1
-    print(f'identical on {", ".join(summaries)}: '+', '.join(f'{key}={reference[key]}' for key in COMPARED))
-    return 0
+    failed=False
+    for fixture,summaries in sorted(groups.items()):
+        if len(summaries)<2:
+            print(f'check_determinism: {fixture}: need summaries from at least two platforms, found {len(summaries)}',file=sys.stderr)
+            failed=True
+            continue
+        reference_name,reference=next(iter(summaries.items()))
+        problems=[f'{name}: {problem}' for name,summary in summaries.items() for problem in differences(reference,summary)]
+        if problems:
+            print(f'check_determinism: {fixture}: platforms disagree with {reference_name}:\n - '+'\n - '.join(problems),file=sys.stderr)
+            failed=True
+        else:
+            print(f'{fixture}: identical on {", ".join(summaries)}: '+', '.join(f'{key}={reference[key]}' for key in COMPARED))
+    return 1 if failed else 0
 
 def main(argv=None):
     argv=sys.argv[1:] if argv is None else argv
