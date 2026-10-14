@@ -8,7 +8,9 @@ using Sovereigns.Simulation;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Diagnostics;
 using Sovereigns.Simulation.Geometry;
+using Sovereigns.Simulation.Kernel;
 using Sovereigns.Simulation.Scenarios;
+using Sovereigns.Simulation.Time;
 using InputEvent = Godot.InputEvent;
 
 namespace Sovereigns.Client.Ui;
@@ -25,9 +27,10 @@ public sealed record ShellContext(
     BuildInfo Build);
 
 /// <summary>
-/// The reusable 2D inspection shell (SOV-P01-T10, T11): pan/zoom map, layer list, location inspector, debug HUD and
-/// the dispatch of input actions. Every view reads the one <see cref="World"/> held by the host; placing or
-/// removing a marker only submits a command, so the world journals it with its sequence and time.
+/// The reusable 2D inspection shell (SOV-P01-T10, T11; SOV-P02-T11, T13): pan/zoom map, layer list, recent events,
+/// location inspector, debug HUD and the dispatch of input actions. Every view reads the one <see cref="World"/>
+/// held by the host. World-changing actions only submit commands, which the world journals with sequence and time;
+/// time controls (pause, step, speed) go to the world's time control and change only how fast the host paces it.
 /// </summary>
 public partial class InspectionShell : Control
 {
@@ -40,12 +43,15 @@ public partial class InspectionShell : Control
     private readonly WorldView _map = new();
     private readonly LayerPanel _layers = new();
     private readonly InspectorPanel _inspector = new();
+    private readonly EventsPanel _events = new();
+    private readonly DecisionBanner _decisions = new();
     private readonly DebugHud _hud = new();
     private readonly LayerLegend _legend = new();
     private readonly StatusBar _status = new();
     private readonly ErrorBanner _banner = new();
     private int _layerIndex;
     private int _markerSerial;
+    private int _breakpointSerial;
     private bool _dragging;
     private bool _failureShown;
     private double _sinceRefresh = double.MaxValue;
@@ -61,6 +67,10 @@ public partial class InspectionShell : Control
     public WorldView Map => _map;
 
     public InspectorPanel Inspector => _inspector;
+
+    public EventsPanel Events => _events;
+
+    public DecisionBanner Decisions => _decisions;
 
     public DebugHud Hud => _hud;
 
@@ -89,12 +99,14 @@ public partial class InspectionShell : Control
         root.AddChild(body);
         var left = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         left.AddChild(_layers);
+        left.AddChild(_events);
         body.AddChild(left);
 
         _map.World = World;
         _map.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         _map.SizeFlagsVertical = SizeFlags.ExpandFill;
         _map.AddChild(_hud);
+        _map.AddChild(_decisions);
         _map.AddChild(_legend);
         body.AddChild(_map);
         body.AddChild(_inspector);
@@ -121,6 +133,10 @@ public partial class InspectionShell : Control
         if (_sinceRefresh >= RefreshSeconds)
         {
             RefreshPanels();
+        }
+        else
+        {
+            UpdateDecisionBanner();
         }
 
         if (!_failureShown && _context.Host.Failure is { } failure)
@@ -179,6 +195,11 @@ public partial class InspectionShell : Control
             InputActions.LayerPrevious => StepLayer(-1),
             InputActions.ToggleHud => ToggleHud(),
             InputActions.FailureReport => WriteManualReport(),
+            InputActions.TimeTogglePause => TogglePause(),
+            InputActions.TimeStep => StepTime(),
+            InputActions.SetBreakpoint => SetBreakpointAtNextMidnight(),
+            InputActions.AcknowledgeDecision => AcknowledgeOldestDecision(),
+            _ when InputActions.SpeedPresetOf(action) is >= 0 and var preset => SetSpeed(preset),
             _ => null,
         };
         if (detail is not null)
@@ -219,6 +240,8 @@ public partial class InspectionShell : Control
         }
 
         _legend.Show(ActiveLayer, World.Markers.Count);
+        _events.Show(World.Ledger);
+        UpdateDecisionBanner();
         _hud.Update(BuildHudModel());
     }
 
@@ -242,10 +265,20 @@ public partial class InspectionShell : Control
             SelectLocation(select);
         }
 
+        if (arguments?.Speed is { } speed)
+        {
+            SetSpeed(speed - 1);
+        }
+
+        if (arguments?.Paused == true)
+        {
+            Control(new Pause());
+        }
+
         if (arguments?.Marker is { } marker)
         {
             _markerSerial++;
-            _context.Host.TrySubmit(new PlaceMarker(marker, $"M{_markerSerial}"));
+            Submit(new PlaceMarker(marker, $"M{_markerSerial}"));
         }
     }
 
@@ -295,9 +328,9 @@ public partial class InspectionShell : Control
         }
 
         var label = $"M{++_markerSerial}";
-        if (_context.Host.TrySubmit(new PlaceMarker(point, label)))
+        if (Submit(new PlaceMarker(point, label)) is { Rejection: null })
         {
-            _status.ShowStatus($"PlaceMarker {label} submitted at {point}; the world applies it at its next step ({World.StepMs} ms).");
+            _status.ShowStatus($"PlaceMarker {label} applied at {point}, {ClockText.Date(World.Now)}.");
         }
 
         return $"{label} at {point}";
@@ -321,10 +354,108 @@ public partial class InspectionShell : Control
             return "no marker in reach";
         }
 
-        _context.Host.TrySubmit(new RemoveMarker(nearest.Id));
-        _status.ShowStatus($"RemoveMarker {nearest.Id} submitted; the world applies it at its next step.");
+        if (Submit(new RemoveMarker(nearest.Id)) is { Rejection: null })
+        {
+            _status.ShowStatus($"RemoveMarker {nearest.Id} applied, {ClockText.Date(World.Now)}.");
+        }
+
         return nearest.Id.ToString();
     }
+
+    /// <summary>Applies a world command through the host; a refusal by the world is shown in the status bar.</summary>
+    private JournalEntry? Submit(SimCommand command)
+    {
+        var entry = _context.Host.TrySubmit(command);
+        if (entry?.Rejection is { } reason)
+        {
+            _status.ShowStatus($"{command.GetType().Name} refused: {reason}", LineStyle.Warning);
+        }
+
+        _sinceRefresh = double.MaxValue;
+        return entry;
+    }
+
+    /// <summary>Applies a pacing command to the world's time control; a refusal is shown in the status bar.</summary>
+    private bool Control(ControlCommand command)
+    {
+        var refusal = _context.Host.TryControl(command);
+        if (refusal is not null)
+        {
+            _status.ShowStatus($"{command.GetType().Name} refused: {refusal}", LineStyle.Warning);
+        }
+
+        _sinceRefresh = double.MaxValue;
+        return refusal is null;
+    }
+
+    private string TogglePause()
+    {
+        var pause = !World.TimeControl.Paused;
+        Control(pause ? new Pause() : new Resume());
+        _status.ShowStatus(pause ? $"Time paused. Press {KeyNames(InputActions.TimeTogglePause)} to resume." : "Time running.");
+        return pause ? "pause" : "resume";
+    }
+
+    private string StepTime()
+    {
+        if (World.PendingDecisions.Count > 0)
+        {
+            _status.ShowStatus($"A decision is pending; acknowledge it first ({KeyNames(InputActions.AcknowledgeDecision)}). Time cannot step.", LineStyle.Warning);
+            return "blocked by a pending decision";
+        }
+
+        Control(new StepOnce());
+        _status.ShowStatus($"One step ({World.StepMs} ms) requested.");
+        return "step once";
+    }
+
+    private string SetSpeed(int preset)
+    {
+        var speed = TimeControl.Presets[preset];
+        if (Control(new SetSpeed(speed)))
+        {
+            _status.ShowStatus($"Speed set to {ClockText.Speed(speed)}.");
+        }
+
+        return ClockText.Speed(speed);
+    }
+
+    private string SetBreakpointAtNextMidnight()
+    {
+        var at = WorldCalendar.StartOfDay(World.Now).Plus(WorldCalendar.MillisecondsPerDay);
+        var label = $"B{++_breakpointSerial}";
+        if (Submit(new SetBreakpoint(at, label)) is { Rejection: null })
+        {
+            _status.ShowStatus($"Breakpoint {label} set for {ClockText.Date(at)}; time stops there until it is acknowledged.");
+        }
+
+        return $"{label} at {ClockText.Date(at)}";
+    }
+
+    private string AcknowledgeOldestDecision()
+    {
+        if (World.PendingDecisions.Count == 0)
+        {
+            _status.ShowStatus("No decision is pending.", LineStyle.Warning);
+            return "none pending";
+        }
+
+        var decision = World.PendingDecisions[0];
+        if (Submit(new AcknowledgeDecision(decision.Event)) is { Rejection: null })
+        {
+            _status.ShowStatus($"Decision \"{decision.Label}\" acknowledged; time may continue.");
+        }
+
+        return $"{decision.Event} {decision.Label}";
+    }
+
+    private string KeyNames(string action)
+    {
+        var keys = _context.Bindings.Get(action).Select(binding => binding.DisplayName).ToList();
+        return keys.Count == 0 ? action : string.Join(" / ", keys);
+    }
+
+    private void UpdateDecisionBanner() => _decisions.Show(World.PendingDecisions, KeyNames(InputActions.AcknowledgeDecision));
 
     private string StepLayer(int direction)
     {
@@ -360,18 +491,27 @@ public partial class InspectionShell : Control
         var transform = _map.Transform;
         var recent = _context.RecentLog;
         var lastProblem = recent.LastWarningOrError;
+        var control = World.TimeControl;
         return new DebugHudModel(
             World.Seed,
             _context.Selection.FixtureReference,
             World.ScenarioId.ToString(),
             World.Now,
+            World.Identity.Geography.HemisphereAt(World.Extent.North / 2),
             World.StepCount,
             World.StepMs,
+            control.Paused,
+            control.SimMillisecondsPerRealSecond,
+            control.RequestedSteps,
+            [.. World.PendingDecisions],
+            KeyNames(InputActions.AcknowledgeDecision),
+            World.Ledger.Count,
             transform.Centre,
             transform.MetresPerPixel,
             Engine.GetFramesPerSecond(),
             _frameMs,
-            _context.Host.LastStepCostMs,
+            _context.Host.LastAdvanceCostMs,
+            _context.Host.LastAdvanceSteps,
             GC.GetTotalMemory(forceFullCollection: false),
             (long)Performance.GetMonitor(Performance.Monitor.MemoryStatic),
             (int)Performance.GetMonitor(Performance.Monitor.ObjectOrphanNodeCount),
@@ -379,7 +519,6 @@ public partial class InspectionShell : Control
             recent.ErrorCount,
             lastProblem is null ? null : $"{lastProblem.Severity} {lastProblem.Subsystem}: {lastProblem.Message}",
             World.Journal.Entries.Count,
-            World.PendingCommandCount,
             _checksum,
             _context.Build.Configuration,
             _context.Host.Failure is not null);

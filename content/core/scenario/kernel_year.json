@@ -1,0 +1,20 @@
+{
+  "id": "core:scenario/kernel_year",
+  "description": "Empty world run across a calendar year from mid-November 1202: season and year boundaries, scheduled decisions and long command streams for the Phase 02 kernel. No physical fields exist yet.",
+  "extent_m": {
+    "east": 100000,
+    "north": 100000
+  },
+  "geography": {
+    "south_edge_latitude_deg": 47.5,
+    "standard_meridian_east_m": 50000
+  },
+  "start": {
+    "year": 1202,
+    "month": 11,
+    "day": 15,
+    "hour": 6
+  },
+  "step_ms": 1000,
+  "duration_ms": 34560000000
+}

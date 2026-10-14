@@ -1,8 +1,11 @@
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Diagnostics;
+using Sovereigns.Simulation.Events;
 using Sovereigns.Simulation.Fields;
 using Sovereigns.Simulation.Geometry;
-using Sovereigns.Simulation.Markers;
+using Sovereigns.Simulation.Identity;
+using Sovereigns.Simulation.Ids;
+using Sovereigns.Simulation.Scenarios;
 using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Simulation.Tests;
@@ -10,47 +13,48 @@ namespace Sovereigns.Simulation.Tests;
 public sealed class WorldTests
 {
     [Fact]
-    public void NewWorldStartsAtEpochAndAdvancesInWholeSteps()
+    public void NewWorldStartsAtTheScenarioStartAndAdvancesInWholeSteps()
     {
-        var world = World.Create(TestSupport.Scenario(stepMs: 250), seed: 7);
+        var start = new CalendarStart(1203, 3, 1, 6);
+        var world = World.Create(TestSupport.Scenario(stepMs: 250, start: start), seed: 7);
+        var startTime = WorldCalendar.FromCalendar(1203, 3, 1, 6);
 
-        Assert.Equal(SimTime.Zero, world.Now);
+        Assert.Equal(startTime, world.Now);
+        Assert.Equal(startTime, world.Identity.Start);
         world.Step();
-        world.AdvanceTo(new SimTime(1_000));
+        world.AdvanceTo(startTime.Plus(1_000));
 
-        Assert.Equal(new SimTime(1_000), world.Now);
+        Assert.Equal(startTime.Plus(1_000), world.Now);
         Assert.Equal(4, world.StepCount);
     }
 
     [Theory]
     [InlineData(999)]
     [InlineData(-1_000)]
-    public void AdvanceToRejectsTargetsOffTheStepGrid(long target)
+    public void AdvanceToRejectsTargetsOffTheStepGridOrInThePast(long offset)
     {
         var world = World.Create(TestSupport.Scenario(stepMs: 1_000), seed: 7);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => world.AdvanceTo(new SimTime(target)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => world.AdvanceTo(world.Now.Plus(offset)));
         Assert.Equal(SimTime.Zero, world.Now);
     }
 
     [Fact]
-    public void CommandsTakeEffectAtTheNextStepBoundaryInSubmissionOrder()
+    public void CommandsApplyImmediatelyInSubmissionOrderAndAreJournaled()
     {
         var world = World.Create(TestSupport.Scenario(), seed: 7);
         world.AdvanceTo(new SimTime(3_000));
 
-        world.Submit(new PlaceMarker(new WorldPoint(10, 20), "first"));
-        world.Submit(new PlaceMarker(new WorldPoint(30, 40), "second"));
-        Assert.Empty(world.Markers);
-        Assert.Equal(2, world.PendingCommandCount);
-
-        world.Step();
+        var first = world.Submit(new PlaceMarker(new WorldPoint(10, 20), "first"));
+        var second = world.Submit(new PlaceMarker(new WorldPoint(30, 40), "second"));
 
         Assert.Equal(["first", "second"], world.Markers.Select(marker => marker.Label));
         Assert.All(world.Markers, marker => Assert.Equal(new SimTime(3_000), marker.PlacedAt));
-        Assert.Equal([1L, 2L], world.Journal.Entries.Select(entry => entry.Sequence));
+        Assert.Equal((1L, 2L), (first.Sequence, second.Sequence));
         Assert.All(world.Journal.Entries, entry => Assert.Equal(new SimTime(3_000), entry.At));
-        Assert.Equal(0, world.PendingCommandCount);
+        var placed = world.Ledger.Events.Where(worldEvent => worldEvent.Type == WorldEventType.MarkerPlaced).ToList();
+        Assert.Equal([1L, 2L], placed.Select(worldEvent => worldEvent.Cause.CommandSequence!.Value));
+        Assert.Equal(["marker:1"], placed[0].Subjects);
     }
 
     [Fact]
@@ -58,26 +62,25 @@ public sealed class WorldTests
     {
         var sink = new ListSink();
         var world = World.Create(TestSupport.Scenario(east: 100, north: 100), seed: 7, new Logger([sink], LogSeverity.Debug));
-        var before = world.ComputeChecksum();
+        var eventsBefore = world.Ledger.Count;
 
         world.Submit(new PlaceMarker(new WorldPoint(100, 50), "on the east edge"));
         world.Submit(new PlaceMarker(new WorldPoint(double.NaN, 50), "nan"));
         world.Submit(new PlaceMarker(new WorldPoint(5, 5), new string('x', PlaceMarker.MaxLabelLength + 1)));
-        world.Submit(new RemoveMarker(new MarkerId(99)));
-        world.Step();
+        world.Submit(new RemoveMarker(new EntityId<Kind.Marker>(99)));
+        world.Submit(new SetBreakpoint(world.Now, "now is not the future"));
+        world.Submit(new SetBreakpoint(world.Now.Plus(1_500), "off the step grid"));
+        world.Submit(new AcknowledgeDecision(new EntityId<Kind.Event>(1)));
 
         Assert.Empty(world.Markers);
-        Assert.Equal(4, world.Journal.Entries.Count);
+        Assert.Equal(7, world.Journal.Entries.Count);
         Assert.All(world.Journal.Entries, entry => Assert.NotNull(entry.Rejection));
         Assert.Contains("outside the world", world.Journal.Entries[0].Rejection, StringComparison.Ordinal);
         Assert.Contains("marker:99 does not exist", world.Journal.Entries[3].Rejection, StringComparison.Ordinal);
-        Assert.Equal(4, sink.Records.Count(record => record.Severity == LogSeverity.Warning));
-
-        // Only time moved; no rejected command changed state.
-        var reference = World.Create(TestSupport.Scenario(east: 100, north: 100), seed: 7);
-        reference.Step();
-        Assert.NotEqual(before, world.ComputeChecksum());
-        Assert.Equal(reference.ComputeChecksum(), world.ComputeChecksum());
+        Assert.Equal(7, sink.Records.Count(record => record.Severity == LogSeverity.Warning));
+        Assert.Equal(eventsBefore, world.Ledger.Count);
+        Assert.Empty(world.Breakpoints);
+        Assert.Empty(world.PendingDecisions);
     }
 
     [Fact]
@@ -86,44 +89,47 @@ public sealed class WorldTests
         var world = World.Create(TestSupport.Scenario(), seed: 7);
         world.Submit(new PlaceMarker(new WorldPoint(1, 1), "a"));
         world.Submit(new PlaceMarker(new WorldPoint(2, 2), "b"));
-        world.Step();
-        world.Submit(new RemoveMarker(new MarkerId(2)));
+        world.Submit(new RemoveMarker(new EntityId<Kind.Marker>(2)));
         world.Submit(new PlaceMarker(new WorldPoint(3, 3), "c"));
-        world.Step();
+        var again = world.Submit(new RemoveMarker(new EntityId<Kind.Marker>(2)));
 
-        Assert.Equal([new MarkerId(1), new MarkerId(3)], world.Markers.Select(marker => marker.Id));
+        Assert.Equal([1UL, 3UL], world.Markers.Select(marker => marker.Id.Value));
+        Assert.Contains("already removed", again.Rejection, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void InspectionReportsEveryFieldFamilyAndFabricatesNoPhysicalValues()
+    public void InspectionReportsEveryFieldFamilyWithProvenanceAndFabricatesNoPhysicalValues()
     {
         var world = World.Create(TestSupport.Scenario(), seed: 42);
         world.Submit(new PlaceMarker(new WorldPoint(500, 500), "near"));
         world.Submit(new PlaceMarker(new WorldPoint(900, 500), "far"));
-        world.Step();
+        world.AdvanceTo(new SimTime(WorldCalendar.MillisecondsPerHour * 13));
 
         var inspection = world.Inspect(new WorldPoint(510, 500), markerRadiusM: 50);
 
         Assert.True(inspection.InsideWorld);
-        Assert.Equal(world.Now, inspection.At);
+        Assert.Equal((world.Now, 42UL, world.Extent), (inspection.At, inspection.WorldSeed, inspection.WorldExtent));
         Assert.Equal(FieldFamilies.All.Select(family => family.Key), inspection.Families.Select(family => family.Family.Key));
-        Assert.Equal(16, inspection.Families.Count);
         var unavailable = inspection.Families.Where(family => family.Availability == FieldAvailability.Unavailable).ToList();
         Assert.Equal(15, unavailable.Count);
         Assert.All(unavailable, family =>
         {
             var reading = Assert.Single(family.Readings);
-            Assert.False(reading.IsAvailable);
-            Assert.Contains(family.Family.Owner, reading.UnavailableReason, StringComparison.Ordinal);
+            Assert.Equal(ReadingBasis.Unavailable, reading.Basis);
+            Assert.Null(reading.Value);
             Assert.Contains(family.Family.FirstImplementedBy, reading.UnavailableReason, StringComparison.Ordinal);
         });
 
-        var geographic = Assert.Single(inspection.Families, family => family.Availability == FieldAvailability.Partial);
-        Assert.Equal((42UL, world.Extent), (inspection.WorldSeed, inspection.WorldExtent));
-        Assert.Equal(510.0, geographic.Readings.Single(reading => reading.Quantity == "easting x").Value);
-        Assert.Equal(500.0, geographic.Readings.Single(reading => reading.Quantity == "northing y").Value);
-        Assert.Equal("m", geographic.Readings.Single(reading => reading.Quantity == "easting x").Unit);
-        Assert.All(geographic.Readings.Where(reading => !reading.IsAvailable), reading => Assert.NotNull(reading.UnavailableReason));
+        var readings = inspection.Families[0].Readings.ToDictionary(reading => reading.Quantity);
+        Assert.Equal((510.0, "m", ReadingBasis.Query), (readings["easting x"].Value, readings["easting x"].Unit, readings["easting x"].Basis));
+        var latitude = readings["latitude"];
+        Assert.Equal(ReadingBasis.Derived, latitude.Basis);
+        Assert.Equal("rad", latitude.Unit);
+        Assert.Equal(45 * Math.PI / 180 + 500 / GeographicReference.MetresPerRadian, latitude.Value!.Value, 12);
+        Assert.Equal("World foundation", latitude.Owner);
+        Assert.NotNull(latitude.Derivation);
+        Assert.Equal(world.Now, readings["local mean solar time"].UpdatedAt);
+        Assert.Equal(ReadingBasis.Unavailable, readings["elevation above datum"].Basis);
         Assert.Equal("near", Assert.Single(inspection.NearbyMarkers).Label);
     }
 
@@ -131,21 +137,23 @@ public sealed class WorldTests
     [InlineData(-0.001, 10)]
     [InlineData(10, 8_000)]
     [InlineData(10_000, 10)]
-    public void InspectionOutsideTheFrameSaysSo(double x, double y)
+    public void InspectionOutsideTheFrameDerivesNothing(double x, double y)
     {
         var world = World.Create(TestSupport.Scenario(east: 10_000, north: 8_000), seed: 1);
 
         var inspection = world.Inspect(new WorldPoint(x, y));
 
         Assert.False(inspection.InsideWorld);
+        Assert.All(inspection.Families[0].Readings.Where(reading => reading.Basis != ReadingBasis.Query),
+            reading => Assert.Equal(ReadingBasis.Unavailable, reading.Basis));
     }
 
     [Fact]
-    public void ChecksumDependsOnSeedTimeAndCommandsOnly()
+    public void ChecksumDependsOnSeedTimeAndCommandsButNotWorldId()
     {
-        static World Run(ulong seed, long until, bool marker)
+        static World Run(ulong seed, long until, bool marker, ulong id = 1)
         {
-            var world = World.Create(TestSupport.Scenario(), seed);
+            var world = World.Create(TestSupport.Scenario(), seed, id: new WorldId(id));
             if (marker)
             {
                 world.Submit(new PlaceMarker(new WorldPoint(1, 2), "m"));
@@ -158,6 +166,7 @@ public sealed class WorldTests
         var baseline = Run(1, 5_000, marker: true).ComputeChecksum();
 
         Assert.Equal(baseline, Run(1, 5_000, marker: true).ComputeChecksum());
+        Assert.Equal(baseline, Run(1, 5_000, marker: true, id: 2).ComputeChecksum());
         Assert.NotEqual(baseline, Run(2, 5_000, marker: true).ComputeChecksum());
         Assert.NotEqual(baseline, Run(1, 6_000, marker: true).ComputeChecksum());
         Assert.NotEqual(baseline, Run(1, 5_000, marker: false).ComputeChecksum());
@@ -165,6 +174,49 @@ public sealed class WorldTests
     }
 
     [Fact]
-    public void CreationRejectsAnInvalidScenario() =>
+    public void ControlCommandsChangePacingButNeitherStateNorJournal()
+    {
+        var plain = World.Create(TestSupport.Scenario(), seed: 3);
+        var controlled = World.Create(TestSupport.Scenario(), seed: 3);
+        Assert.Null(controlled.Control(new Pause()));
+        Assert.Null(controlled.Control(new SetSpeed(3_600_000)));
+        Assert.Null(controlled.Control(new StepOnce()));
+        Assert.Null(controlled.Control(new Resume()));
+        Assert.NotNull(controlled.Control(new SetSpeed(0)));
+        plain.Submit(new PlaceMarker(new WorldPoint(1, 1), "m"));
+        controlled.Submit(new PlaceMarker(new WorldPoint(1, 1), "m"));
+
+        Assert.Equal((false, 3_600_000L, 1), (controlled.TimeControl.Paused, controlled.TimeControl.SimMillisecondsPerRealSecond, controlled.TimeControl.RequestedSteps));
+        Assert.Equal(plain.Journal.Entries, controlled.Journal.Entries);
+        Assert.Equal(plain.ComputeChecksum(), controlled.ComputeChecksum());
+        Assert.Throws<ArgumentException>(() => controlled.Submit(new Pause()));
+    }
+
+    [Fact]
+    public void ARejectedCommandStillCountsAsAppliedInput()
+    {
+        // A rejected command takes a sequence number, so later causes differ; the checksum must see it (ADR-0007).
+        var plain = World.Create(TestSupport.Scenario(), seed: 3);
+        var withRejection = World.Create(TestSupport.Scenario(), seed: 3);
+        withRejection.Submit(new RemoveMarker(new EntityId<Kind.Marker>(1)));
+
+        Assert.NotEqual(plain.ComputeChecksum(), withRejection.ComputeChecksum());
+    }
+
+    [Fact]
+    public void SpeedIsCappedAtOneYearPerSecond()
+    {
+        var world = World.Create(TestSupport.Scenario(), seed: 3);
+
+        Assert.Null(world.Control(new SetSpeed(Kernel.TimeControl.MaxSimMillisecondsPerRealSecond)));
+        Assert.NotNull(world.Control(new SetSpeed(Kernel.TimeControl.MaxSimMillisecondsPerRealSecond + 1)));
+    }
+
+    [Fact]
+    public void CreationRejectsAnInvalidScenario()
+    {
         Assert.Throws<ArgumentException>(() => World.Create(TestSupport.Scenario(stepMs: 0), seed: 1));
+        Assert.Throws<ArgumentException>(() => World.Create(TestSupport.Scenario(stepMs: 7_000), seed: 1));
+        Assert.Throws<ArgumentException>(() => World.Create(TestSupport.Scenario(southLatitudeDeg: 89), seed: 1));
+    }
 }

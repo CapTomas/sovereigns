@@ -5,6 +5,7 @@ using Sovereigns.Client.View;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Diagnostics;
 using Sovereigns.Simulation.Fields;
+using Sovereigns.Simulation.Kernel;
 using Sovereigns.Simulation.Scenarios;
 using Sovereigns.Simulation.Time;
 
@@ -22,6 +23,9 @@ public sealed class ShellTests(ClientTestRunner runner)
         new("shell: layers list every family, unavailable layers show No data, and the inspector lists 16 families", LayersAndInspector),
         new("shell: wheel zoom anchors at the cursor, middle-drag pans and recenter fits the world", CameraInput),
         new("shell: a bad launch argument or scenario is shown, not fatal", LaunchProblemsAreShown),
+        new("shell: time actions set pause, step and speed on the world's time control, never enter the journal, and are kept in the input history", TimeActionsControlPacing),
+        new("shell: --paused and --speed start the world paused at the chosen speed", StartupTimeOptions),
+        new("shell: B stops time at the next midnight even at 1 week/s, shows the pending decision, and Enter acknowledges it", BreakpointStopsTimeUntilAcknowledged),
         new("shell: an injected failure writes a report, stops the host and shows a banner; replay reproduces it", FailureIsReported),
         new("shell: freeing the shell returns the orphan node count to its baseline and shuts down cleanly", NoOrphansAfterFree),
         new("shell: the close request and the quit action each log the shutdown checksum and request exit (must run last)", CloseAndQuit),
@@ -58,8 +62,17 @@ public sealed class ShellTests(ClientTestRunner runner)
             main.Shell!.RefreshPanels();
             var hud = main.Shell.Hud.Text;
             Check.Contains(hud, "seed: 20261009", "HUD seed");
-            Check.Contains(hud, "fixture: F-EMPTY@1", "HUD fixture");
+            Check.Contains(hud, "fixture: F-EMPTY@2", "HUD fixture");
             Check.Contains(hud, "scenario: core:scenario/empty_world", "HUD scenario");
+            Check.Contains(hud, "date: 1 Mar 1203, 06:00:00", "HUD standard date and time, not raw milliseconds");
+            Check.Contains(hud, "season: Spring (northern hemisphere)", "HUD season and hemisphere");
+            Check.Contains(hud, "time: running at 1 s/s", "HUD time-control state");
+            Check.Contains(hud, "pending decisions: none", "HUD pending decisions");
+            Check.Contains(hud, "ledger events: 1", "HUD ledger count");
+            Check.Contains(hud, "steps: 0", "HUD step count");
+            Check.True(!hud.Contains("SOV-P02-T11", StringComparison.Ordinal), "the time-controls placeholder is gone");
+            Check.Contains(main.Shell.Events.Title, "Recent events (1 of 1)", "events panel title");
+            Check.Contains(main.Shell.Events.Lines[0].Text, "WorldCreated", "events panel lists the creation event");
             Check.Contains(hud, "active world chunk: unavailable", "HUD chunk line");
             Check.Contains(hud, "state checksum: ", "HUD checksum");
             Check.Contains(main.Shell.Status.HelpText, "Select: LMB", "help line from the bindings");
@@ -93,17 +106,15 @@ public sealed class ShellTests(ClientTestRunner runner)
 
             Press(Key.M);
             await runner.Frames(2);
-            Check.Equal(0, world.Journal.Entries.Count, "the command waits for the next simulation step");
-            Check.Equal(1, world.PendingCommandCount, "one pending command");
-            main.Host.Advance(1.0);
             var entry = world.Journal.Entries.Single();
             Check.True(entry.Command is PlaceMarker place && place.Position == selected && place.Label == "M1", "journal holds PlaceMarker at the selected point");
             Check.True(entry.Rejection is null, "world accepted the marker");
-            Check.Equal(1, world.Markers.Count, "marker exists in the world");
+            Check.Equal(1, world.Markers.Count, "marker exists in the world as soon as the command is applied");
+            main.Host.Advance(1.0);
 
             Press(Key.Delete);
             await runner.Frames(2);
-            main.Host.Advance(2.0);
+            main.Host.Advance(1.0);
             Check.True(world.Journal.Entries[1].Command is RemoveMarker, "remove_marker journals RemoveMarker");
             Check.Equal(0, world.Markers.Count, "marker removed");
 
@@ -156,6 +167,8 @@ public sealed class ShellTests(ClientTestRunner runner)
             }
 
             Check.True(shell.Inspector.Lines.Any(line => line.Style == LineStyle.Dim && line.Text.Contains("Phase 07", StringComparison.Ordinal)), "unavailable readings are dim and name their phase");
+            Check.True(shell.Inspector.Lines.Any(line => line.Text.Contains("owner: World foundation", StringComparison.Ordinal)) &&
+                shell.Inspector.Lines.Any(line => line.Text.Contains("derivation: φ = φ₀", StringComparison.Ordinal)), "readings list their provenance");
             Check.True(!text.Contains("fake", StringComparison.OrdinalIgnoreCase), "no invented values");
 
             Check.Equal(MapLayer.WorldFrameKey, shell.ActiveLayer.Key, "starts on the world frame layer");
@@ -260,21 +273,158 @@ public sealed class ShellTests(ClientTestRunner runner)
         }
     }
 
-    private async Task FailureIsReported()
+    private async Task TimeActionsControlPacing()
     {
         using var workspace = new Workspace();
-        var main = await Boot(workspace, "--fixture", "F-EMPTY", "--fail-at-ms", "2000", "--marker", "40000,60000");
+        var main = await Boot(workspace, "--fixture", "F-EMPTY");
+        try
+        {
+            var world = main.Host!.World;
+            var shell = main.Shell!;
+            var control = world.TimeControl;
+            var checksum = world.ComputeChecksum();
+            Check.True(!control.Paused && control.SimMillisecondsPerRealSecond == TimeControl.Presets[0], "starts running at 1 s/s");
+
+            Press(Key.Space);
+            Check.True(control.Paused, "Space pauses");
+            Press(Key.Space);
+            Check.True(!control.Paused, "Space again resumes");
+            Press(Key.Period);
+            Check.Equal(1, control.RequestedSteps, "Period requests one step");
+            main.Host.Advance(0.016);
+            Check.Equal(0, control.RequestedSteps, "the host uses the requested step");
+            Check.Equal(1L, world.StepCount, "and the world advanced exactly one step");
+
+            for (var preset = 0; preset < TimeControl.Presets.Count; preset++)
+            {
+                Press((Key)((int)Key.Key1 + preset));
+                Check.Equal(TimeControl.Presets[preset], control.SimMillisecondsPerRealSecond, $"key {preset + 1} selects the preset");
+            }
+
+            Press(Key.Space);
+            shell.RefreshPanels();
+            Check.Contains(shell.Hud.Text, "time: PAUSED (speed 1 week/s)", "HUD shows the paused state and speed");
+            Check.Equal(0, world.Journal.Entries.Count, "pacing never enters the journal");
+
+            Press(Key.B);
+            Check.Equal(1, world.Journal.Entries.Count, "a breakpoint is a world command and is journaled");
+            var set = world.Journal.Entries[0];
+            var midnight = WorldCalendar.StartOfDay(world.Now).Plus(WorldCalendar.MillisecondsPerDay);
+            Check.True(set.Command is SetBreakpoint { Label: "B1" } breakpoint && breakpoint.At == midnight && set.Rejection is null, "B sets breakpoint B1 at the next standard-time midnight");
+            Check.Contains(shell.Status.HelpText, "Speed: 1/2/3/4/5", "the help line lists the speed keys");
+            Check.Contains(shell.Status.HelpText, "Acknowledge: Enter", "the help line lists the acknowledge key");
+
+            Press(Key.Enter);
+            Check.Equal(1, world.Journal.Entries.Count, "Enter with no decision pending submits nothing");
+
+            var actions = main.Inputs.Snapshot().Select(handled => handled.Action).ToList();
+            string[] timeActions = [InputActions.TimeTogglePause, InputActions.TimeStep, .. InputActions.TimeSpeeds, InputActions.SetBreakpoint, InputActions.AcknowledgeDecision];
+            foreach (var action in timeActions)
+            {
+                Check.True(actions.Contains(action), $"input history lists {action}");
+            }
+
+            // Pacing left no trace in the state: the same world without any of it has the same checksum, apart from the one step and breakpoint.
+            var plain = TestWorlds.LaunchFixture().World!;
+            plain.AdvanceTo(plain.Now.Plus(plain.StepMs));
+            plain.Submit(new SetBreakpoint(midnight, "B1"));
+            Check.Equal(plain.ComputeChecksum(), world.ComputeChecksum(), "pausing, stepping and speed changes do not change the checksum");
+            Check.True(checksum != world.ComputeChecksum(), "the step and the breakpoint did");
+        }
+        finally
+        {
+            await Dispose(main);
+        }
+    }
+
+    private async Task StartupTimeOptions()
+    {
+        using var workspace = new Workspace();
+        var main = await Boot(workspace, "--fixture", "F-EMPTY", "--paused", "--speed", "3");
+        try
+        {
+            var world = main.Host!.World;
+            Check.True(world.TimeControl.Paused, "--paused pauses time at startup");
+            Check.Equal(TimeControl.Presets[2], world.TimeControl.SimMillisecondsPerRealSecond, "--speed 3 is 1 h/s");
+            TestWorlds.Frames(main.Host, 40, 0.25);
+            Check.Equal(world.Identity.Start, world.Now, "a paused world does not advance");
+            main.Shell!.RefreshPanels();
+            Check.Contains(main.Shell.Hud.Text, "time: PAUSED (speed 1 h/s)", "HUD shows the startup state");
+            Check.Equal(0, world.Journal.Entries.Count, "startup pacing is not journaled");
+        }
+        finally
+        {
+            await Dispose(main);
+        }
+    }
+
+    private async Task BreakpointStopsTimeUntilAcknowledged()
+    {
+        using var workspace = new Workspace();
+        var main = await Boot(workspace, "--fixture", "F-EMPTY", "--speed", "5");
         try
         {
             var host = main.Host!;
-            host.Advance(5.0);
+            var world = host.World;
+            var shell = main.Shell!;
+            Check.Equal(TimeControl.Presets[4], world.TimeControl.SimMillisecondsPerRealSecond, "--speed 5 is 1 week/s");
+
+            Press(Key.B);
+            var midnight = world.Breakpoints.Single().At;
+            Check.Equal(WorldCalendar.StartOfDay(world.Now).Plus(WorldCalendar.MillisecondsPerDay), midnight, "the breakpoint is at the next midnight");
+
+            // At 1 week/s a quarter second of real time is 1.75 days, so only the decision can stop the world at midnight.
+            TestWorlds.Frames(host, 8, 0.25);
+            Check.Equal(midnight, world.Now, "time stopped exactly at the breakpoint");
+            Check.Equal(1, world.PendingDecisions.Count, "one decision is pending");
+            await runner.Frames(2);
+            shell.RefreshPanels();
+            Check.True(shell.Decisions.Visible, "the decision strip is visible");
+            Check.Equal("Decision pending: B1 — press Enter to acknowledge", shell.Decisions.Text, "the strip names the decision and the key");
+            Check.Contains(shell.Hud.Text, "DECISION PENDING: B1", "HUD lists the pending decision");
+            Check.Contains(shell.Hud.Text, "STOPPED by a pending decision", "HUD shows time is stopped");
+            Check.Contains(shell.Events.Lines[0].Text, "DecisionRaised", "the events panel lists the raised decision");
+
+            Press(Key.Period);
+            Check.Equal(0, world.TimeControl.RequestedSteps, "a step is not queued behind a pending decision");
+            TestWorlds.Frames(host, 8, 0.25);
+            Check.Equal(midnight, world.Now, "time stays stopped until the decision is acknowledged");
+
+            var decision = world.PendingDecisions[0];
+            Press(Key.Enter);
+            Check.Equal(0, world.PendingDecisions.Count, "Enter acknowledges the oldest pending decision");
+            Check.True(world.Journal.Entries[^1].Command is AcknowledgeDecision acknowledge && acknowledge.Decision == decision.Event && world.Journal.Entries[^1].Rejection is null,
+                "the acknowledgement is journaled with the decision's event ID");
+            host.Advance(0.25);
+            Check.True(world.Now > midnight, "time continues after the acknowledgement");
+            await runner.Frames(2);
+            shell.RefreshPanels();
+            Check.True(!shell.Decisions.Visible, "the decision strip hides");
+            Check.Contains(shell.Hud.Text, "time: running at 1 week/s", "HUD shows time running again");
+            Check.True(shell.Events.Lines.Any(line => line.Text.EndsWith("DecisionAcknowledged", StringComparison.Ordinal)), "the events panel lists the acknowledgement");
+        }
+        finally
+        {
+            await Dispose(main);
+        }
+    }
+
+    private async Task FailureIsReported()
+    {
+        using var workspace = new Workspace();
+        var main = await Boot(workspace, "--fixture", "F-EMPTY", "--fail-after-ms", "2000", "--marker", "40000,60000");
+        try
+        {
+            var host = main.Host!;
+            var failAt = host.World.Identity.Start.Milliseconds + 2000;
+            TestWorlds.Frames(host, 12, 0.25);
             Check.True(host.Failure is { ReportPath: not null }, "the host stopped and wrote a report");
             var failure = host.Failure!;
             Check.True(File.Exists(failure.ReportPath), "report file exists");
             Check.Contains(failure.ReplayCommand, "replay", "reproduction command");
-            Check.Equal(2000L, host.World.Now.Milliseconds, "the world stopped at the injected time");
-            host.Advance(5.0);
-            Check.Equal(2000L, host.World.Now.Milliseconds, "a failed host stops advancing");
+            Check.Equal(failAt, host.World.Now.Milliseconds, "the world stopped at the injected time, relative to its start");
+            TestWorlds.Frames(host, 8, 0.25);
+            Check.Equal(failAt, host.World.Now.Milliseconds, "a failed host stops advancing");
 
             await runner.Frames(3);
             Check.True(main.Shell!.Banner.Visible && main.Shell.Banner.Text.Contains(failure.ReportPath!, StringComparison.Ordinal), "banner shows the report path");
@@ -282,7 +432,7 @@ public sealed class ShellTests(ClientTestRunner runner)
             using var stream = File.OpenRead(failure.ReportPath!);
             var report = FailureReport.ReadFrom(stream);
             Check.Equal("client", report.Host, "report host");
-            Check.Equal(2000L, report.SimTimeMs, "report time");
+            Check.Equal(failAt, report.SimTimeMs, "report time");
             Check.Equal(1, report.Commands.Count, "report holds the journal");
             var replayed = Replay.Run(main.Launch!.Selection!.Scenario, report.Seed, report.Commands, new SimTime(report.SimTimeMs));
             Check.Equal(report.StateChecksum, replayed.ComputeChecksum(), "replaying the report reproduces the checksum");

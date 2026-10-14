@@ -63,7 +63,15 @@ def fixture_errors(name,data):
             errors.append(f'Fixture {fid}: scenario path must stay inside the repository')
         elif not (ROOT/data['scenario']).exists():
             errors.append(f'Fixture {fid}: scenario path {data["scenario"]} does not exist')
+        commands=data.get('commands')
+        if commands is not None:
+            if not isinstance(commands,str) or not (ROOT/commands).resolve().is_relative_to(ROOT):
+                errors.append(f'Fixture {fid}: commands must be a repository path to a command journal')
+            elif not (ROOT/commands).is_file():
+                errors.append(f'Fixture {fid}: commands path {commands} does not exist')
     else: errors.append(f'Fixture {fid}: status must be blank or defined')
+    if status=='blank' and data.get('commands') is not None:
+        errors.append(f'Fixture {fid}: blank fixtures have no command journal')
     return errors
 
 def matrix_names(name,matrix):

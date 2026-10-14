@@ -42,9 +42,14 @@ class TestContext(unittest.TestCase):
         self.assertEqual(validate_repo.fixture_errors('F-X',blank),[])
         for change in ({'id':'F-Y'},{'version':0},{'version':True},{'purpose':' '},{'seed':7},
                        {'status':'done'},{'status':'defined'},{'status':'defined','seed':7,'scenario':'no/such/file'},
-                       {'status':'defined','seed':7,'scenario':'../outside.json'}):
+                       {'status':'defined','seed':7,'scenario':'../outside.json'},{'commands':'tests/fixtures/F-KERNEL.commands.jsonl'}):
             with self.subTest(change=change):
                 self.assertTrue(validate_repo.fixture_errors('F-X',{**blank,**change}))
+        defined={**blank,'status':'defined','seed':7,'scenario':'content/core/scenario/kernel_year.json'}
+        self.assertEqual(validate_repo.fixture_errors('F-X',{**defined,'commands':'tests/fixtures/F-KERNEL.commands.jsonl'}),[])
+        for commands in ('tests/fixtures/missing.jsonl','../outside.jsonl',7):
+            with self.subTest(commands=commands):
+                self.assertTrue(validate_repo.fixture_errors('F-X',{**defined,'commands':commands}))
 
     def test_spec_version_picks_newest(self):
         record='**1.1.0 · 2026-10-08:** a\n**1.10.0 · 2027-01-02:** b\n**1.9.3 · 2026-12-01:** c'

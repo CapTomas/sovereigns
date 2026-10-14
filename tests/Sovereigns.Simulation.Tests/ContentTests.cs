@@ -10,6 +10,8 @@ public sealed class ContentTests
           "id": "core:scenario/sample",
           "description": "sample",
           "extent_m": { "east": 1000, "north": 500 },
+          "geography": { "south_edge_latitude_deg": 50, "standard_meridian_east_m": 500 },
+          "start": { "year": 1203, "month": 3, "day": 1 },
           "step_ms": 1000,
           "duration_ms": 5000
         }
@@ -57,9 +59,9 @@ public sealed class ContentTests
         var error = Assert.Single(ContentCatalog.Load(root).Errors);
 
         Assert.Equal("content/core/scenario/sample.json", error.File);
-        Assert.Equal(5, error.Line);
+        Assert.Equal(7, error.Line);
         Assert.Contains("stepms", error.ToString(), StringComparison.Ordinal);
-        Assert.Contains("members are: id, description, extent_m, step_ms, duration_ms", error.Hint, StringComparison.Ordinal);
+        Assert.Contains("members are: id, description, extent_m, geography, start, step_ms, duration_ms", error.Hint, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -92,6 +94,9 @@ public sealed class ContentTests
     [InlineData("\"duration_ms\": 5000", "\"duration_ms\": 5500", "$.duration_ms")]
     [InlineData("\"east\": 1000", "\"east\": -1", "$.extent_m")]
     [InlineData("\"description\": \"sample\"", "\"description\": \" \"", "$.description")]
+    [InlineData("\"month\": 3, \"day\": 1", "\"month\": 2, \"day\": 30", "$.start")]
+    [InlineData("\"south_edge_latitude_deg\": 50", "\"south_edge_latitude_deg\": 86", "$.geography")]
+    [InlineData("\"standard_meridian_east_m\": 500", "\"standard_meridian_east_m\": 5000", "$.geography")]
     public void SemanticRulesAreChecked(string original, string replacement, string path)
     {
         var root = Tree(("core/scenario/sample.json", ValidScenario.Replace(original, replacement, StringComparison.Ordinal)));

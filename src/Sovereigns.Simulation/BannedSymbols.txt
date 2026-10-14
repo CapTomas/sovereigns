@@ -10,3 +10,4 @@ T:System.Diagnostics.Stopwatch;Simulation must not read wall-clock time (ADR-000
 T:System.Random;Use the world's seeded random streams (SOV-P02-T06), never System.Random
 M:System.Guid.NewGuid;GUIDs are not deterministic (ADR-0004 §5); allocate per-kind entity IDs
 M:System.String.GetHashCode;String hash codes are randomized per process; never use them to decide outcomes
+T:System.Security.Cryptography.RandomNumberGenerator;Simulation must not read randomness; hosts create world IDs (ADR-0006) and systems use keyed random streams

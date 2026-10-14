@@ -2,7 +2,7 @@
 
 **Procedurally generated, physically interconnected medieval grand strategy with persistent, real-time regiment battles.**
 
-Phase 01 foundation: game specifications, delivery tasks, a .NET simulation kernel running a seeded empty world, a headless runner, a Godot development inspection shell, and CI. Physical fields, world generation and gameplay start in Phase 02 and later phases.
+Phase 02 foundation: game specifications, delivery tasks, and a .NET simulation kernel. The kernel holds world identity and calendar, an event-driven clock with scheduled systems, decision interrupts, keyed random streams, an event ledger and versioned saves. Around it are a headless runner, a Godot development inspection shell with time controls, and CI. Physical fields, world generation and gameplay start in Phase 03 and later phases.
 
 ## Build and run
 

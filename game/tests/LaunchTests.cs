@@ -15,15 +15,18 @@ public static class LaunchTests
 
     private static Task ParsesOptions()
     {
-        var args = LaunchArguments.Parse(["--fixture", "F-EMPTY", "--fail-at-ms", "3000", "--select", "100.5,200", "--marker", "1,2", "--capture-frame", "30", "--layer", "snow_frozen"]);
+        var args = LaunchArguments.Parse(["--fixture", "F-EMPTY", "--fail-after-ms", "3000", "--select", "100.5,200", "--marker", "1,2", "--capture-frame", "30", "--layer", "snow_frozen", "--paused", "--speed", "4"]);
         Check.Equal("F-EMPTY", args.Fixture, "fixture");
-        Check.Equal(3000L, args.FailAtMs, "fail-at-ms");
+        Check.Equal(3000L, args.FailAfterMs, "fail-after-ms");
+        Check.True(args.Paused, "--paused is a flag without a value");
+        Check.Equal(4, args.Speed, "speed preset");
+        Check.True(!LaunchArguments.Parse([]).Paused && LaunchArguments.Parse([]).Speed is null, "time options are off by default");
         Check.Equal(new WorldPoint(100.5, 200), args.Select, "select");
         Check.Equal(new WorldPoint(1, 2), args.Marker, "marker");
         Check.Equal(30, args.CaptureFrame, "capture frame");
         Check.Equal(10, LaunchArguments.Parse([]).CaptureFrame, "default capture frame");
 
-        foreach (var bad in new[] { new[] { "--bogus", "1" }, ["--fixture"], ["--seed", "1", "--seed", "2"], ["--select", "5"], ["--fail-at-ms", "-1"], ["fixture", "F-EMPTY"] })
+        foreach (var bad in new[] { new[] { "--bogus", "1" }, ["--fixture"], ["--seed", "1", "--seed", "2"], ["--select", "5"], ["--fail-after-ms", "-1"], ["--fail-at-ms", "1"], ["fixture", "F-EMPTY"], ["--speed", "0"], ["--speed", "6"], ["--speed", "fast"], ["--paused", "--paused"] })
         {
             var message = ExpectLaunchException(() => LaunchArguments.Parse(bad), $"arguments {string.Join(' ', bad)}");
             Check.True(message.Length > 0, "the message says what is wrong");
@@ -43,12 +46,18 @@ public static class LaunchTests
 
         var fixture = Launch("--fixture", "F-EMPTY");
         Check.Equal(TestWorlds.FixtureSeed, fixture.World!.Seed, "fixture pins the seed");
-        Check.Equal("F-EMPTY@1", fixture.Selection!.FixtureReference, "fixture reference");
+        Check.Equal("F-EMPTY@2", fixture.Selection!.FixtureReference, "fixture reference");
 
         var explicitSeed = Launch("--scenario", TestWorlds.FixtureScenario, "--seed", "42");
         Check.Equal(42UL, explicitSeed.World!.Seed, "explicit seed");
         Check.True(explicitSeed.Selection!.FixtureReference is null, "no fixture");
         Check.Equal(WorldLauncher.DefaultSeed, Launch().World!.Seed, "default seed without arguments");
+
+        Check.Equal(0, fixture.Script!.Count, "F-EMPTY has no command stream");
+        var kernel = Launch("--fixture", "F-KERNEL");
+        Check.Equal(20261014UL, kernel.World!.Seed, "F-KERNEL pins its seed");
+        Check.True(kernel.Script is { Count: > 0 } script && script.All(entry => entry.At >= kernel.World.Now), "F-KERNEL loads its command stream, none before the start");
+        Check.True(kernel.World.Identity.Id != fixture.World.Identity.Id, "each launch creates a world with a fresh ID");
 
         Check.True(Launch("--fixture", "F-EMPTY", "--seed", "7") is { Succeeded: false }, "a fixture cannot be combined with a seed");
         Check.True(Launch("--seed", "7") is { Succeeded: false }, "a seed needs a scenario");

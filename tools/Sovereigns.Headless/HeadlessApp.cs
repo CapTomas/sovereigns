@@ -1,17 +1,20 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Sovereigns.Simulation;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Content;
 using Sovereigns.Simulation.Diagnostics;
+using Sovereigns.Simulation.Identity;
+using Sovereigns.Simulation.Persistence;
 using Sovereigns.Simulation.Scenarios;
 using Sovereigns.Simulation.Serialization;
 using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Headless;
 
-/// <summary>Command-line host for the simulation without the game client (SOV-P01-T04, T08, T09, T13).</summary>
+/// <summary>Command-line host for the simulation without the game client (SOV-P01-T04, T08, T09, T13; SOV-P02-T12).</summary>
 internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
 {
     public const int Ok = 0;
@@ -22,24 +25,28 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
     private const string Usage = """
         Usage: sovereigns-headless <command> [options]
 
-          run --fixture <F-ID|path> | --scenario <content-id> --seed <n>
-              [--until-ms <ms>] [--commands <journal.jsonl>] [--record <journal.jsonl>]
-              [--log <file.jsonl>] [--reports <dir>] [--fail-at-ms <ms>] [--repo <dir>]
-              Runs the world headless and prints a JSON summary with the state checksum.
-              --fail-at-ms injects a failure to exercise failure reporting.
-          replay <failure-report.json> [--repo <dir>]
-              Rebuilds the reported world from seed, scenario and commands and compares checksums,
-              or re-runs a failing step to reproduce its exception.
+          run (--fixture <F-ID|path> | --scenario <content-id> --seed <n> | --load <save.json>)
+              [--for-ms <ms> | --until-ms <ms>] [--commands <journal.jsonl>] [--record <journal.jsonl>]
+              [--save <save.json>] [--log <file.jsonl>] [--reports <dir>] [--fail-after-ms <ms>] [--repo <dir>]
+              Runs the world headless and prints a JSON summary with the state checksum. --for-ms is relative to
+              the start (default: the scenario duration; 0 after --load); --until-ms is absolute world time.
+              A fixture's own command journal applies unless --commands is given. --save writes a save at the end.
+              --fail-after-ms injects a failure that many milliseconds after the start, to exercise failure reports.
+          replay <failure-report.json> [--save <save.json>] [--repo <dir>]
+              Rebuilds the reported world from its scenario, or from the save the report names, applies its commands
+              and compares checksums, or reproduces the failing command or step.
           validate-content [--content <dir>] [--repo <dir>]
               Validates content definitions and prints actionable errors.
 
         Exit codes: 0 success, 1 simulation failure (report written), 2 usage or content error, 3 replay mismatch.
         """;
 
+    private static readonly string[] WorldSources = ["fixture", "scenario", "load"];
+
     private static readonly Dictionary<string, string[]> AllowedOptions = new(StringComparer.Ordinal)
     {
-        ["run"] = ["fixture", "scenario", "seed", "until-ms", "commands", "record", "log", "reports", "fail-at-ms", "repo"],
-        ["replay"] = ["repo"],
+        ["run"] = ["fixture", "scenario", "seed", "load", "for-ms", "until-ms", "commands", "record", "save", "log", "reports", "fail-after-ms", "repo"],
+        ["replay"] = ["save", "repo"],
         ["validate-content"] = ["content", "repo"],
     };
 
@@ -93,10 +100,10 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
     private int RunWorld(Options options)
     {
         var repo = RepoRoot(options);
-        var catalog = LoadContent(repo);
-        if (options.Get("fixture") is null && options.Get("scenario") is null)
+        var sources = WorldSources.Count(name => options.Get(name) is not null);
+        if (sources != 1)
         {
-            throw new UsageException("give --fixture <F-ID>, or --scenario <content-id> with --seed <n>");
+            throw new UsageException("give exactly one of --fixture <F-ID>, --scenario <content-id> with --seed <n>, or --load <save.json>");
         }
 
         if (options.Get("scenario") is not null && options.Get("seed") is null)
@@ -104,24 +111,10 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
             throw new UsageException("--scenario needs --seed");
         }
 
-        LaunchSelection selection;
-        try
+        if (options.Get("for-ms") is not null && options.Get("until-ms") is not null)
         {
-            selection = LaunchSelection.Resolve(catalog, Path.Combine(repo, "content"), Path.Combine(repo, "tests", "fixtures"), repo,
-                options.Get("fixture"), options.Get("scenario"), options.Get("seed"), defaultSeed: 0);
+            throw new UsageException("give --for-ms or --until-ms, not both");
         }
-        catch (LaunchException ex)
-        {
-            throw new UsageException(ex.Message);
-        }
-
-        var scenario = selection.Scenario;
-        var seed = selection.Seed;
-        var fixtureReference = selection.FixtureReference;
-        var until = new SimTime(options.Get("until-ms") is { } untilText ? ParseInt64(untilText, "--until-ms") : scenario.DurationMs);
-        var failAt = options.Get("fail-at-ms") is { } failText ? new SimTime(ParseInt64(failText, "--fail-at-ms")) : (SimTime?)null;
-        var journal = options.Get("commands") is { } commandsPath ? ReadJournal(commandsPath) : [];
-        var reports = options.Get("reports") ?? Path.Combine(repo, "artifacts", "reports");
 
         using var logFile = options.Get("log") is { } logPath ? CreateText(logPath) : null;
         var recent = new RecentLogBuffer(200);
@@ -133,39 +126,97 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
 
         var logger = new Logger(sinks, LogSeverity.Info, TimeProvider.System);
         var log = logger.For("headless");
-        var world = World.Create(scenario, seed, logger);
-        if (until.Milliseconds < 0 || until.Milliseconds % scenario.StepMs != 0)
+        World world;
+        string? fixtureReference = null;
+        string? commandsPath = options.Get("commands");
+        long defaultDuration;
+        if (options.Get("load") is { } savePath)
         {
-            throw new UsageException($"--until-ms must be a non-negative multiple of the scenario step ({scenario.StepMs} ms)");
+            world = LoadSave(savePath, logger);
+            defaultDuration = 0;
+        }
+        else
+        {
+            LaunchSelection selection;
+            try
+            {
+                selection = LaunchSelection.Resolve(LoadContent(repo), Path.Combine(repo, "content"), Path.Combine(repo, "tests", "fixtures"), repo,
+                    options.Get("fixture"), options.Get("scenario"), options.Get("seed"), defaultSeed: 0);
+            }
+            catch (LaunchException ex)
+            {
+                throw new UsageException(ex.Message);
+            }
+
+            fixtureReference = selection.FixtureReference;
+            commandsPath ??= selection.CommandsPath;
+            defaultDuration = selection.Scenario.DurationMs;
+            world = World.Create(selection.Scenario, selection.Seed, logger, NewWorldId());
         }
 
-        if (journal.FirstOrDefault(entry => entry.At.Milliseconds < 0 || entry.At.Milliseconds % scenario.StepMs != 0) is { } misaligned)
+        var start = world.Now;
+        var until = options.Get("until-ms") is { } untilText
+            ? new SimTime(ParseInt64(untilText, "--until-ms"))
+            : start.Plus(options.Get("for-ms") is { } forText ? ParseInt64(forText, "--for-ms") : defaultDuration);
+        if (until < start || (until.Milliseconds - start.Milliseconds) % world.StepMs != 0)
         {
-            throw new UsageException($"journal entry {misaligned.Sequence} at {misaligned.At} is not on a {scenario.StepMs} ms step boundary of {scenario.Id}");
+            throw new UsageException($"the end time {until} must be at or after {start} by a whole number of {world.StepMs} ms steps");
+        }
+
+        SimTime? failAt = options.Get("fail-after-ms") is { } failText ? start.Plus(ParseInt64(failText, "--fail-after-ms")) : null;
+        if (failAt is { } failure && (failure < start || (failure.Milliseconds - start.Milliseconds) % world.StepMs != 0))
+        {
+            throw new UsageException($"--fail-after-ms must be a non-negative whole number of {world.StepMs} ms steps");
+        }
+        var journal = commandsPath is null ? [] : ReadJournal(commandsPath);
+        if (journal.FirstOrDefault(entry => entry.At < start || (entry.At.Milliseconds - start.Milliseconds) % world.StepMs != 0) is { } misaligned)
+        {
+            throw new UsageException($"journal entry {misaligned.Sequence} at {misaligned.At} is before {start} or not on a {world.StepMs} ms step boundary of {world.ScenarioId}");
         }
 
         var stepCost = Stopwatch.StartNew();
+        var stoppedAtDecision = false;
         try
         {
-            var next = 0;
-            while (world.Now < until)
+            SimTime AdvanceTo(SimTime target)
             {
-                if (failAt is { } failure && world.Now >= failure)
+                if (failAt is { } failure && failure <= target)
                 {
-                    throw new InjectedFailureException($"failure injected by --fail-at-ms at {world.Now}");
+                    if (world.AdvanceTo(failure) == failure)
+                    {
+                        throw new InjectedFailureException($"failure injected by --fail-after-ms at {failure}");
+                    }
+
+                    return world.Now;
                 }
 
-                while (next < journal.Count && journal[next].At == world.Now)
-                {
-                    world.Submit(journal[next++].Command);
-                }
-
-                world.Step();
+                return world.AdvanceTo(target);
             }
 
-            if (next < journal.Count)
+            var applied = 0;
+            foreach (var entry in journal.TakeWhile(entry => entry.At <= until))
             {
-                log.Warning($"{journal.Count - next} journal command(s) fall after the end time and were not applied");
+                if (AdvanceTo(entry.At) != entry.At)
+                {
+                    break;
+                }
+
+                if (entry.Command is ControlCommand control)
+                {
+                    world.Control(control);
+                }
+                else
+                {
+                    world.Submit(entry.Command);
+                }
+
+                applied++;
+            }
+
+            stoppedAtDecision = AdvanceTo(until) != until;
+            if (applied < journal.Count)
+            {
+                log.Warning($"{journal.Count - applied} journal command(s) were not applied: they fall after the end, or a decision stopped time first");
             }
         }
 #pragma warning disable CA1031 // Any simulation failure becomes a failure report and exit code 1.
@@ -173,38 +224,55 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
 #pragma warning restore CA1031
         {
             log.Error("simulation failed", ex);
-            var report = FailureReport.Capture(world, "headless", ex.Message, ex, BuildInfo.Describe(typeof(HeadlessApp).Assembly), recent);
-            string reportPath;
-            try
-            {
-                reportPath = report.WriteToDirectory(reports);
-            }
-#pragma warning disable CA1031 // A failure while reporting must not hide the original failure.
-            catch (Exception writeError)
-#pragma warning restore CA1031
-            {
-                stderr.WriteLine($"could not write the failure report to {reports}: {writeError.Message}");
-                return Failed;
-            }
-
-            stderr.WriteLine($"failure report: {reportPath}");
-            stderr.WriteLine($"reproduce: sovereigns-headless replay {reportPath}");
-            return Failed;
+            return WriteFailureReport(world, ex, recent, options.Get("reports") ?? Path.Combine(repo, "artifacts", "reports"));
         }
 
         stepCost.Stop();
+        if (stoppedAtDecision)
+        {
+            log.Warning($"stopped at {world.Now} by pending decision(s): {string.Join(", ", world.PendingDecisions.Select(decision => $"{decision.Event} {decision.Label}"))}");
+        }
+
         if (options.Get("record") is { } recordPath)
         {
             using var writer = CreateText(recordPath);
             CommandJournal.WriteJsonLines(world.Journal.Entries, writer);
         }
 
-        var summary = new RunSummary(fixtureReference, world.ScenarioId.ToString(), world.Seed, world.Now.Milliseconds,
-            world.StepCount, world.Journal.Entries.Count, world.Markers.Count, world.ComputeChecksum(),
-            stepCost.Elapsed.TotalMilliseconds, GC.GetTotalMemory(forceFullCollection: false),
-            Environment.WorkingSet);
+        if (options.Get("save") is { } savePathOut)
+        {
+            using var stream = CreateFile(savePathOut);
+            SaveFile.Capture(world).WriteTo(stream);
+        }
+
+        var summary = new RunSummary(fixtureReference, world.ScenarioId.ToString(), world.Identity.Id.ToString(), world.BaseSaveSha256,
+            world.Seed, WorldCalendar.ToCalendar(world.Identity.Start).ToString(), WorldCalendar.ToCalendar(world.Now).ToString(),
+            world.Now.Milliseconds, world.StepCount, world.Journal.Entries.Count, world.Markers.Count, world.Ledger.Count,
+            world.PendingDecisions.Count, stoppedAtDecision, world.ComputeChecksum(), stepCost.Elapsed.TotalMilliseconds,
+            GC.GetTotalMemory(forceFullCollection: false), Environment.WorkingSet);
         stdout.WriteLine(JsonSerializer.Serialize(summary, SimJson.Options));
         return Ok;
+    }
+
+    private int WriteFailureReport(World world, Exception ex, RecentLogBuffer recent, string reports)
+    {
+        var report = FailureReport.Capture(world, "headless", ex.Message, ex, BuildInfo.Describe(typeof(HeadlessApp).Assembly), recent);
+        string reportPath;
+        try
+        {
+            reportPath = report.WriteToDirectory(reports);
+        }
+#pragma warning disable CA1031 // A failure while reporting must not hide the original failure.
+        catch (Exception writeError)
+#pragma warning restore CA1031
+        {
+            stderr.WriteLine($"could not write the failure report to {reports}: {writeError.Message}");
+            return Failed;
+        }
+
+        stderr.WriteLine($"failure report: {reportPath}");
+        stderr.WriteLine($"reproduce: sovereigns-headless replay {reportPath}{(world.BaseSaveSha256 is null ? "" : " --save <the loaded save>")}");
+        return Failed;
     }
 
     private int ReplayReport(Options options)
@@ -221,22 +289,37 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
             throw new UsageException($"cannot read failure report {path}: {ex.Message}");
         }
 
-        var repo = RepoRoot(options);
-        ScenarioDefinition scenario;
-        try
+        World world;
+        if (report.BaseSaveSha256 is { } baseSave)
         {
-            scenario = LaunchSelection.Resolve(LoadContent(repo), Path.Combine(repo, "content"), null, repo,
-                fixture: null, report.Scenario, report.Seed.ToString(CultureInfo.InvariantCulture), defaultSeed: 0).Scenario;
+            var savePath = options.Get("save") ?? throw new UsageException($"the reported session started from save {baseSave}; pass it with --save <save.json>");
+            world = LoadSave(savePath, Logger.None);
+            if (world.BaseSaveSha256 != baseSave)
+            {
+                throw new UsageException($"{savePath} has payload {world.BaseSaveSha256}, not the reported {baseSave}");
+            }
         }
-        catch (LaunchException ex)
+        else
         {
-            throw new UsageException(ex.Message);
+            var repo = RepoRoot(options);
+            ScenarioDefinition scenario;
+            try
+            {
+                scenario = LaunchSelection.Resolve(LoadContent(repo), Path.Combine(repo, "content"), null, repo,
+                    fixture: null, report.Scenario, report.Seed.ToString(CultureInfo.InvariantCulture), defaultSeed: 0).Scenario;
+            }
+            catch (LaunchException ex)
+            {
+                throw new UsageException(ex.Message);
+            }
+
+            // An unreadable ID only changes the world's identity, which no outcome or checksum depends on.
+            world = World.Create(scenario, report.Seed, Logger.None, WorldId.TryParse(report.WorldId, out var id) ? id : default);
         }
 
-        World world;
         try
         {
-            world = Replay.Run(scenario, report.Seed, report.Commands, new SimTime(report.SimTimeMs));
+            Replay.Continue(world, report.Commands, new SimTime(report.SimTimeMs));
         }
 #pragma warning disable CA1031 // Any failure while rebuilding a reported world means the report no longer reproduces.
         catch (Exception ex)
@@ -248,9 +331,9 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
 
         stdout.WriteLine($"replayed seed {report.Seed}, {report.Scenario}, {report.Commands.Count} command(s) to {world.Now}");
         stdout.WriteLine($"reason: {report.Reason}");
-        if (report.FailedInStep)
+        if (report.FailedDuring != FaultStage.None)
         {
-            return ReproduceFailingStep(world, report);
+            return ReproduceFault(world, report);
         }
 
         var checksum = world.ComputeChecksum();
@@ -265,17 +348,23 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         return matches ? Ok : Mismatch;
     }
 
-    /// <summary>Submits the failing step's inputs to the rebuilt world and steps once, expecting the reported failure.</summary>
-    private int ReproduceFailingStep(World world, FailureReport report)
+    /// <summary>Repeats the failing command or step on the rebuilt world, expecting the reported exception type.</summary>
+    private int ReproduceFault(World world, FailureReport report)
     {
-        foreach (var command in report.PendingCommands)
-        {
-            world.Submit(command);
-        }
-
         try
         {
-            world.Step();
+            if (report.FailedDuring == FaultStage.Command)
+            {
+                world.Submit(report.FailingCommand ?? throw new UsageException("the report names a failing command but does not contain it"));
+            }
+            else
+            {
+                world.Step();
+            }
+        }
+        catch (UsageException)
+        {
+            throw;
         }
 #pragma warning disable CA1031 // Any exception here is the reproduced failure being reported.
         catch (Exception ex)
@@ -284,16 +373,33 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
             // Exception.ToString() starts with the full type name, so a different failure is not mistaken for the reported one.
             if (report.Exception is { } recorded && !recorded.StartsWith(ex.GetType().FullName + ":", StringComparison.Ordinal))
             {
-                stdout.WriteLine($"failure MISMATCH in the step at {report.SimTimeMs} ms: reported {recorded.Split('\n')[0]}, replay threw {ex.GetType().FullName}: {ex.Message}");
+                stdout.WriteLine($"failure MISMATCH during the {report.FailedDuring} at {report.SimTimeMs} ms: reported {recorded.Split('\n')[0]}, replay threw {ex.GetType().FullName}: {ex.Message}");
                 return Mismatch;
             }
 
-            stdout.WriteLine($"failure reproduced in the step at {report.SimTimeMs} ms with {report.PendingCommands.Count} pending command(s): {ex.GetType().Name}: {ex.Message}");
+            stdout.WriteLine($"failure reproduced during the {report.FailedDuring} at {report.SimTimeMs} ms: {ex.GetType().Name}: {ex.Message}");
             return Ok;
         }
 
-        stdout.WriteLine($"failure NOT reproduced: the step at {report.SimTimeMs} ms completed with {report.PendingCommands.Count} pending command(s)");
+        stdout.WriteLine($"failure NOT reproduced: the {report.FailedDuring} at {report.SimTimeMs} ms completed");
         return Mismatch;
+    }
+
+    private static World LoadSave(string path, Logger logger)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            return SaveFile.Load(stream, logger);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new UsageException($"cannot read save {path}: {ex.Message}");
+        }
+        catch (SaveLoadException ex)
+        {
+            throw new UsageException($"{path}: {ex.Message}");
+        }
     }
 
     private ContentCatalog LoadContent(string repo)
@@ -325,15 +431,20 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         }
     }
 
-    private static StreamWriter CreateText(string path)
+    /// <summary>A fresh durable world ID from operating-system randomness; hosts may read it, the simulation may not.</summary>
+    private static WorldId NewWorldId() => WorldId.FromBytes(RandomNumberGenerator.GetBytes(16));
+
+    private static FileStream CreateFile(string path)
     {
         if (Path.GetDirectoryName(Path.GetFullPath(path)) is { } directory)
         {
             Directory.CreateDirectory(directory);
         }
 
-        return new StreamWriter(path) { NewLine = "\n" };
+        return File.Create(path);
     }
+
+    private static StreamWriter CreateText(string path) => new(CreateFile(path)) { NewLine = "\n" };
 
     private static string RepoRoot(Options options)
     {
@@ -364,11 +475,18 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
     private sealed record RunSummary(
         string? Fixture,
         string Scenario,
+        string WorldId,
+        string? BaseSave,
         ulong Seed,
+        string Start,
+        string Now,
         long SimTimeMs,
         long Steps,
         int Commands,
         int Markers,
+        int Events,
+        int PendingDecisions,
+        bool StoppedAtDecision,
         string Checksum,
         double WallMs,
         long ManagedHeapBytes,
@@ -415,5 +533,5 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
 
 internal sealed class UsageException(string message) : Exception(message);
 
-/// <summary>Deliberate failure requested with --fail-at-ms, used to exercise failure reporting.</summary>
+/// <summary>Deliberate failure requested with --fail-after-ms, used to exercise failure reporting.</summary>
 internal sealed class InjectedFailureException(string message) : Exception(message);

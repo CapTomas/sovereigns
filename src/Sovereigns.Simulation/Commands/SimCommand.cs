@@ -1,16 +1,26 @@
 using System.Text.Json.Serialization;
 using Sovereigns.Simulation.Geometry;
-using Sovereigns.Simulation.Markers;
+using Sovereigns.Simulation.Ids;
+using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Simulation.Commands;
 
 /// <summary>
-/// An explicit request to change authoritative state. Hosts submit commands; the world applies
-/// them in submission order at the next step boundary and records them in its journal.
+/// An explicit request from a host. <see cref="World.Submit"/> applies a world command immediately, at
+/// <see cref="World.Now"/> and before the updates due at that time, and records it in the journal.
+/// <see cref="ControlCommand"/>s go through <see cref="World.Control"/>: they only change how hosts pace time and
+/// are not journaled. A fixture script that hosts play back may contain both; a journal replayed with
+/// <see cref="Replay"/> contains world commands only.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type", UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(PlaceMarker), "place_marker")]
 [JsonDerivedType(typeof(RemoveMarker), "remove_marker")]
+[JsonDerivedType(typeof(SetBreakpoint), "set_breakpoint")]
+[JsonDerivedType(typeof(AcknowledgeDecision), "acknowledge_decision")]
+[JsonDerivedType(typeof(Pause), "pause")]
+[JsonDerivedType(typeof(Resume), "resume")]
+[JsonDerivedType(typeof(SetSpeed), "set_speed")]
+[JsonDerivedType(typeof(StepOnce), "step_once")]
 public abstract record SimCommand;
 
 /// <summary>Pin a labelled developer marker at a position inside the world.</summary>
@@ -20,4 +30,23 @@ public sealed record PlaceMarker(WorldPoint Position, string Label) : SimCommand
 }
 
 /// <summary>Remove an existing developer marker.</summary>
-public sealed record RemoveMarker(MarkerId Marker) : SimCommand;
+public sealed record RemoveMarker(EntityId<Kind.Marker> Marker) : SimCommand;
+
+/// <summary>Schedule a decision interrupt at a future step boundary; time stops there until it is acknowledged.</summary>
+public sealed record SetBreakpoint(SimTime At, string Label) : SimCommand;
+
+/// <summary>Resolve a pending decision so that time may advance again.</summary>
+public sealed record AcknowledgeDecision(EntityId<Kind.Event> Decision) : SimCommand;
+
+/// <summary>Commands that change only host pacing (<see cref="Kernel.TimeControl"/>), never world state; see <see cref="World.Control"/>.</summary>
+public abstract record ControlCommand : SimCommand;
+
+public sealed record Pause : ControlCommand;
+
+public sealed record Resume : ControlCommand;
+
+/// <summary>Set the pace in simulated milliseconds per real second (1000 is real time).</summary>
+public sealed record SetSpeed(long SimMillisecondsPerRealSecond) : ControlCommand;
+
+/// <summary>Request one fixed step, also while paused.</summary>
+public sealed record StepOnce : ControlCommand;
