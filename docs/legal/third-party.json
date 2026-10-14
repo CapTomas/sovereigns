@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "allowed_licenses": [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unlicense",
+    "CC0-1.0",
+    "CC-BY-4.0",
+    "OFL-1.1",
+    "LicenseRef-Project-Original"
+  ],
+  "dependencies": [
+    {
+      "name": "Microsoft.CodeAnalysis.BannedApiAnalyzers",
+      "version": "5.6.0",
+      "kind": "nuget",
+      "scope": "build",
+      "license": "MIT",
+      "source": "https://www.nuget.org/packages/Microsoft.CodeAnalysis.BannedApiAnalyzers/5.6.0",
+      "note": "Analyzer for src/Sovereigns.Simulation only (PrivateAssets=all); nothing ships."
+    },
+    {
+      "name": "Microsoft.NET.Test.Sdk",
+      "version": "18.10.1",
+      "kind": "nuget",
+      "scope": "test",
+      "license": "MIT",
+      "source": "https://www.nuget.org/packages/Microsoft.NET.Test.Sdk/18.10.1"
+    },
+    {
+      "name": "xunit.v3",
+      "version": "3.2.2",
+      "kind": "nuget",
+      "scope": "test",
+      "license": "Apache-2.0",
+      "source": "https://www.nuget.org/packages/xunit.v3/3.2.2"
+    },
+    {
+      "name": "xunit.runner.visualstudio",
+      "version": "3.1.5",
+      "kind": "nuget",
+      "scope": "test",
+      "license": "Apache-2.0",
+      "source": "https://www.nuget.org/packages/xunit.runner.visualstudio/3.1.5"
+    },
+    {
+      "name": "Godot.NET.Sdk",
+      "version": "4.7.2",
+      "kind": "nuget",
+      "scope": "build",
+      "license": "MIT",
+      "source": "https://www.nuget.org/packages/Godot.NET.Sdk/4.7.2",
+      "note": "MSBuild SDK of game/Sovereigns.Client.csproj; brings GodotSharp and Godot.SourceGenerators at the same version."
+    },
+    {
+      "name": "GodotSharp",
+      "version": "4.7.2",
+      "kind": "nuget",
+      "via": "Godot.NET.Sdk",
+      "scope": "runtime",
+      "license": "MIT",
+      "source": "https://www.nuget.org/packages/GodotSharp/4.7.2",
+      "copyright": "Copyright (c) 2014-present Godot Engine contributors. Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur."
+    },
+    {
+      "name": "Godot.SourceGenerators",
+      "version": "4.7.2",
+      "kind": "nuget",
+      "via": "Godot.NET.Sdk",
+      "scope": "build",
+      "license": "MIT",
+      "source": "https://www.nuget.org/packages/Godot.SourceGenerators/4.7.2"
+    },
+    {
+      "name": "Godot Engine (.NET build)",
+      "version": "4.7.2",
+      "kind": "component",
+      "toolchain": "godot.version",
+      "scope": "runtime",
+      "license": "MIT",
+      "source": "https://github.com/godotengine/godot/releases/tag/4.7.2-stable",
+      "copyright": "Copyright (c) 2014-present Godot Engine contributors. Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.",
+      "note": "Exports embed the engine. A redistributed build must also carry Godot's LICENSE.txt and the third-party notices in its COPYRIGHT.txt (Phase 53 packaging)."
+    },
+    {
+      "name": ".NET runtime",
+      "version": "10.0",
+      "kind": "component",
+      "scope": "runtime",
+      "license": "MIT",
+      "source": "https://github.com/dotnet/runtime/blob/main/LICENSE.TXT",
+      "copyright": "Copyright (c) .NET Foundation and Contributors.",
+      "note": "Embedded in self-contained Godot .NET exports."
+    }
+  ],
+  "datasets": [],
+  "assets": [
+    {
+      "path": "game/icon.svg",
+      "license": "LicenseRef-Project-Original",
+      "author": "Sovereigns project",
+      "source": "original",
+      "note": "Placeholder project icon drawn for this repository."
+    }
+  ]
+}

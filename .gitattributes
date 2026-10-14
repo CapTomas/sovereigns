@@ -1,5 +1,10 @@
-* text=auto
-*.md text eol=lf
-*.json text eol=lf
-*.yml text eol=lf
-*.py text eol=lf
+# LF everywhere, including Windows checkouts, so `dotnet format` and .editorconfig agree on every OS.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ogg binary
+*.wav binary
+*.ttf binary
+*.otf binary
+*.tpz binary
+*.zip binary

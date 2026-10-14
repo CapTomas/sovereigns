@@ -5,13 +5,19 @@
   "bypass_actors": [],
   "conditions": {
     "ref_name": {
-      "include": ["~DEFAULT_BRANCH"],
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
       "exclude": []
     }
   },
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
     {
       "type": "pull_request",
       "parameters": {
@@ -27,7 +33,34 @@
       "parameters": {
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
-          { "context": "docs", "integration_id": 15368 }
+          {
+            "context": "docs",
+            "integration_id": 15368
+          },
+          {
+            "context": "simulation (ubuntu-24.04)",
+            "integration_id": 15368
+          },
+          {
+            "context": "simulation (windows-2025)",
+            "integration_id": 15368
+          },
+          {
+            "context": "simulation (macos-15)",
+            "integration_id": 15368
+          },
+          {
+            "context": "client",
+            "integration_id": 15368
+          },
+          {
+            "context": "determinism",
+            "integration_id": 15368
+          },
+          {
+            "context": "package",
+            "integration_id": 15368
+          }
         ]
       }
     }

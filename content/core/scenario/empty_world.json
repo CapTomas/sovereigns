@@ -1,0 +1,10 @@
+{
+  "id": "core:scenario/empty_world",
+  "description": "Seeded empty world for Phase 01: world frame, clock, commands, logging and the inspection shell. No terrain or other physical fields exist yet.",
+  "extent_m": {
+    "east": 100000,
+    "north": 100000
+  },
+  "step_ms": 1000,
+  "duration_ms": 3600000
+}

@@ -2,7 +2,20 @@
 
 **Procedurally generated, physically interconnected medieval grand strategy with persistent, real-time regiment battles.**
 
-This is a Phase 00 foundation: game specifications, delivery tasks and offline Python navigation tools. The independent C# simulation and Godot client are future implementation work.
+Phase 01 foundation: game specifications, delivery tasks, a .NET simulation kernel running a seeded empty world, a headless runner, a Godot development inspection shell, and CI. Physical fields, world generation and gameplay start in Phase 02 and later phases.
+
+## Build and run
+
+Install .NET SDK 10.0.401, Godot 4.7.2 (.NET build) and Python 3.11+ ([setup](docs/development/SETUP.md)), then:
+
+```sh
+python3 tools/doctor.py                                               # check the machine against the pins
+dotnet test Sovereigns.slnx                                           # simulation tests, no Godot needed
+dotnet run --project tools/Sovereigns.Headless -- run --fixture F-EMPTY   # headless seeded run, prints the state checksum
+godot --path game -- --fixture F-EMPTY                                # inspection shell on the same world
+```
+
+Inspection steps are in [game/README.md](game/README.md); logs, failure reports and replay are in [DIAGNOSTICS](docs/development/DIAGNOSTICS.md).
 
 ## Start working
 
@@ -36,7 +49,7 @@ Start a new client session after adding adapters. Model availability and project
 
 ## Check the change
 
-Use Python 3.11+; tooling has no external dependencies. Select checks by [impact and acceptance](docs/agents/QUALITY_BAR.md):
+Use Python 3.11+; Python tooling has no external dependencies. Select checks by [impact and acceptance](docs/agents/QUALITY_BAR.md). The full CI-equivalent commands are in [SETUP](docs/development/SETUP.md#run-the-ci-checks-locally).
 
 ```sh
 # Documentation, hashes, IDs and routing
@@ -44,11 +57,16 @@ python3 tools/validate_repo.py
 
 # Context/tool behavior changes
 python3 -m unittest discover -s tools/tests -v
+
+# Simulation, headless runner and client code (CI=true makes warnings errors)
+dotnet format Sovereigns.slnx --verify-no-changes
+dotnet test Sovereigns.slnx
+godot --headless --path game res://tests/ClientTests.tscn
 ```
 
 Reuse meaningful checks, run them after coherent changes, and stop once acceptance and material review concerns are resolved. Save/replay, integration and profiling checks apply when their behavior is affected or an explicit delivery gate requires them.
 
-World/simulation increments also need continuous human-visible feedback: an early reusable development viewer, real data layers/inspectors, time controls when implemented, and short launch/seed/scenario instructions. You should be able to inspect generated terrain, added elevation, rivers, weather and later nonspatial data as each arrives. The Phase 11 laboratory extends this viewer; it is not the first opportunity to see the simulation. See [the human-feedback policy](docs/agents/QUALITY_BAR.md#human-visible-feedback-during-development). These are delivery requirements; no runnable viewer exists in the current scaffold yet.
+World/simulation increments also need continuous human-visible feedback: the reusable development viewer, real data layers/inspectors, time controls when implemented, and short launch/seed/scenario instructions. You should be able to inspect generated terrain, added elevation, rivers, weather and later nonspatial data as each arrives. The Phase 11 laboratory extends this viewer; it is not the first opportunity to see the simulation. See [the human-feedback policy](docs/agents/QUALITY_BAR.md#human-visible-feedback-during-development). The viewer is the Phase 01 inspection shell in `game/`; each subsystem adds its layers and inspector values to it.
 
 ## Structure and authority
 
@@ -60,10 +78,14 @@ World/simulation increments also need continuous human-visible feedback: an earl
 | `meta/` | Generated task/spec routing metadata |
 | `docs/agents/` | Current engineering workflow, model routing and quality policy |
 | `.codex/`, `.claude/` | Client adapters and focused worker definitions |
-| `tools/` | Offline context and validation CLI |
-| `src/`, `game/`, `tests/` | Future simulation, Godot client and game verification |
+| `src/` | Independent C# simulation (`Sovereigns.Simulation`) |
+| `game/` | Godot 4 .NET client and development inspection shell |
+| `content/` | Versioned content definitions (`namespace:kind/name`) |
+| `tests/` | Simulation tests and versioned reference fixtures |
+| `tools/` | Headless runner (`Sovereigns.Headless`), context/validation CLI, bootstrap doctor, CI helpers |
+| `docs/development/`, `docs/legal/` | Setup and diagnostics guides; third-party license registry |
 | `docs/visual/` | Separate visual direction and art constraints |
 
-Godot 4 .NET presents the world and accepts commands; independent C#/.NET owns simulation, time and saves, without Godot dependencies. Exact runtime releases are Phase 01 decisions. Preserve one authoritative world across strategic and tactical views.
+Godot 4 .NET presents the world and accepts commands; independent C#/.NET owns simulation, time and saves, without Godot dependencies. Exact versions and layout are in [ADR-0005](docs/architecture/ADR-0005-toolchain-and-repository-layout.md). Preserve one authoritative world across strategic and tactical views.
 
-This checkout is connected to the [CapTomas/sovereigns repository](https://github.com/CapTomas/sovereigns). Offline validators do not establish game execution, remote CI or phase completion. Tracked tasks remain unchecked until their required review accepts the evidence.
+This checkout is connected to the [CapTomas/sovereigns repository](https://github.com/CapTomas/sovereigns). The `Build and test` workflow runs the .NET, client and (on `main`) packaging checks. Offline validators alone do not establish game execution, remote CI or phase completion. Tracked tasks remain unchecked until their required review accepts the evidence.

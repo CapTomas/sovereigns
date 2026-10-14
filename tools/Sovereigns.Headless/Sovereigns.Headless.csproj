@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless runner: fixtures, scenarios, replay and content validation without the game client. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>sovereigns-headless</AssemblyName>
+    <RootNamespace>Sovereigns.Headless</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Sovereigns.Simulation/Sovereigns.Simulation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sovereigns.Simulation.Tests" />
+  </ItemGroup>
+</Project>

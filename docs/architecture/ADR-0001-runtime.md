@@ -1,6 +1,6 @@
 # ADR-0001 — Game runtime and simulation separation
 
-**Status:** Accepted design choice; exact dependency/runtime versions await reproducible Phase 01 verification.  
+**Status:** Accepted design choice. Exact versions are pinned in [ADR-0005](ADR-0005-toolchain-and-repository-layout.md).  
 **Decision date:** 2026-10-08  
 **Scope:** Runtime selection, source ownership and developer workflows.
 

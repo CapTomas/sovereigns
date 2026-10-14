@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Authoritative simulation. References only the .NET base library: no Godot, UI or store SDK (ADR-0001). -->
+  <PropertyGroup>
+    <RootNamespace>Sovereigns.Simulation</RootNamespace>
+    <!-- A banned nondeterministic API is a defect in every configuration, not only in CI. -->
+    <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
+    <!-- Godot exports restore with these runtime identifiers (ADR-0003); listing them keeps locked restore valid. -->
+    <RuntimeIdentifiers>linux-x64;win-x64;osx-arm64;osx-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Bans wall-clock time, unseeded randomness and GUIDs inside the simulation (ADR-0004 §3). -->
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="BannedSymbols.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sovereigns.Simulation.Tests" />
+  </ItemGroup>
+</Project>

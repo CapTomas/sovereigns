@@ -1,0 +1,20 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+# Godot builds and exports through this solution; Sovereigns.slnx at the repository root is for dotnet tooling.
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sovereigns.Client", "Sovereigns.Client.csproj", "{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		ExportDebug|Any CPU = ExportDebug|Any CPU
+		ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{7A1E3C52-0B6D-4C58-9E21-5D0F3A8B2C41}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+	EndGlobalSection
+EndGlobal
