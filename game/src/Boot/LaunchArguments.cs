@@ -1,4 +1,7 @@
 using System.Globalization;
+using Sovereigns.Client.View;
+using Sovereigns.Simulation.Atlas;
+using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Geometry;
 using Sovereigns.Simulation.Kernel;
 using Sovereigns.Simulation.Scenarios;
@@ -14,13 +17,17 @@ public sealed record LaunchArguments
     public const string Usage =
         "Options: --fixture <F-ID|path> | --scenario <content-id> --seed <n>; --content <dir>; --log <file.jsonl>; " +
         "--reports <dir>; --bindings <file.json>; --record <journal.jsonl>; --capture <file.png>; --capture-frame <n>; --fail-after-ms <ms>; " +
-        "--select <x,y>; --marker <x,y>; --layer <name>; --paused; --speed <1-5>";
+        "--select <x,y>; --marker <x,y>; --layer <key|name>; --paused; --speed <1-5>; " +
+        "--paint <x,y,radius,value[;...]>; --line <x,y;x,y[;...][|...]>; --center <x,y>; --zoom <m/px>; --level <macro|regional|local|tactical>; --residency; --no-hud";
 
     private static readonly string[] OptionNames =
-        ["fixture", "scenario", "seed", "content", "log", "reports", "bindings", "record", "capture", "capture-frame", "fail-after-ms", "select", "marker", "layer", "speed"];
+    [
+        "fixture", "scenario", "seed", "content", "log", "reports", "bindings", "record", "capture", "capture-frame", "fail-after-ms",
+        "select", "marker", "layer", "speed", "paint", "line", "center", "zoom", "level",
+    ];
 
     /// <summary>Options that stand alone, without a value.</summary>
-    private static readonly string[] FlagNames = ["paused"];
+    private static readonly string[] FlagNames = ["paused", "residency", "no-hud"];
 
     private static string[]? s_injected;
 
@@ -67,6 +74,27 @@ public sealed record LaunchArguments
 
     /// <summary>Layer key or name to activate at startup.</summary>
     public string? Layer { get; init; }
+
+    /// <summary>Scratch strokes to submit as <c>PaintScratch</c> commands at startup, in order.</summary>
+    public IReadOnlyList<PaintScratch> Paint { get; init; } = [];
+
+    /// <summary>Survey lines to submit as <c>DrawSurveyLine</c> commands at startup, labelled S1, S2, …</summary>
+    public IReadOnlyList<IReadOnlyList<WorldPoint>> Lines { get; init; } = [];
+
+    /// <summary>World position of the map centre at startup.</summary>
+    public WorldPoint? Center { get; init; }
+
+    /// <summary>Map scale at startup, in metres per screen pixel.</summary>
+    public double? MetresPerPixel { get; init; }
+
+    /// <summary>Atlas level to sample and inspect at, instead of the one the zoom chooses.</summary>
+    public GridLevel? Level { get; init; }
+
+    /// <summary>Start with the chunk-residency overlay on.</summary>
+    public bool Residency { get; init; }
+
+    /// <summary>Start with the debug HUD hidden.</summary>
+    public bool HideHud { get; init; }
 
     /// <summary>
     /// Supplies arguments to the next <see cref="FromEnvironment"/> call instead of the command line.
@@ -135,8 +163,62 @@ public sealed record LaunchArguments
             Speed = values.TryGetValue("speed", out var speed) ? ParseSpeed(speed) : null,
             Select = values.TryGetValue("select", out var select) ? ParsePoint("--select", select) : null,
             Marker = values.TryGetValue("marker", out var marker) ? ParsePoint("--marker", marker) : null,
+            Paint = values.TryGetValue("paint", out var paint) ? ParsePaint(paint) : [],
+            Lines = values.TryGetValue("line", out var line) ? ParseLines(line) : [],
+            Center = values.TryGetValue("center", out var center) ? ParsePoint("--center", center) : null,
+            MetresPerPixel = values.TryGetValue("zoom", out var zoom) ? ParseZoom(zoom) : null,
+            Level = values.TryGetValue("level", out var level) ? ParseLevel(level) : null,
+            Residency = values.ContainsKey("residency"),
+            HideHud = values.ContainsKey("no-hud"),
         };
     }
+
+    private static List<PaintScratch> ParsePaint(string text)
+    {
+        var strokes = new List<PaintScratch>();
+        foreach (var stroke in text.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = stroke.Split(',');
+            if (parts.Length == 4 &&
+                double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) &&
+                double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var y) &&
+                double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var radius) &&
+                double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var value) &&
+                double.IsFinite(x) && double.IsFinite(y) && radius > 0 && radius <= PaintScratch.MaxRadiusM && value is >= 0 and <= 1)
+            {
+                strokes.Add(new PaintScratch(new WorldPoint(x, y), radius, value));
+                continue;
+            }
+
+            throw new LaunchException($"--paint must be east,north,radius,value strokes separated by ';' with 0 < radius <= {PaintScratch.MaxRadiusM:0} m and a value from 0 to 1, such as 50000,50000,500,1; found '{stroke}'");
+        }
+
+        return strokes.Count > 0 ? strokes : throw new LaunchException("--paint needs at least one stroke east,north,radius,value");
+    }
+
+    private static List<IReadOnlyList<WorldPoint>> ParseLines(string text)
+    {
+        var lines = new List<IReadOnlyList<WorldPoint>>();
+        foreach (var line in text.Split('|', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var points = line.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(point => ParsePoint("--line", point)).ToList();
+            lines.Add(points.Count is >= 2 and <= DrawSurveyLine.MaxPoints
+                ? points
+                : throw new LaunchException($"--line needs 2 to {DrawSurveyLine.MaxPoints} points east,north separated by ';' (lines separated by '|'), found {points.Count} in '{line}'"));
+        }
+
+        return lines.Count > 0 ? lines : throw new LaunchException("--line needs at least one line of points east,north;east,north");
+    }
+
+    private static double ParseZoom(string text) =>
+        double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && double.IsFinite(value) && value > 0
+            ? value
+            : throw new LaunchException($"--zoom must be a positive number of metres per screen pixel such as 25, found '{text}'");
+
+    private static GridLevel ParseLevel(string text) =>
+        ViewLevels.TryParse(text, out var level)
+            ? level
+            : throw new LaunchException($"--level must be macro, regional, local or tactical, found '{text}'");
 
     private static int ParseCaptureFrame(string text) =>
         int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) && value > 0

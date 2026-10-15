@@ -1,4 +1,5 @@
 using System.Globalization;
+using Sovereigns.Simulation.Atlas;
 using Sovereigns.Simulation.Geometry;
 using Sovereigns.Simulation.Kernel;
 using Sovereigns.Simulation.Time;
@@ -22,6 +23,11 @@ public sealed record DebugHudModel(
     int LedgerEvents,
     WorldPoint CameraCentre,
     double MetresPerPixel,
+    ChunkKey ActiveChunk,
+    Residency ActiveResidency,
+    string ActiveChunkField,
+    ChunkCacheStatistics Cache,
+    string Overlay,
     double Fps,
     double FrameMs,
     double LastAdvanceCostMs,
@@ -37,7 +43,7 @@ public sealed record DebugHudModel(
     string BuildConfiguration,
     bool Failed);
 
-/// <summary>A translucent overlay of seed, date, time control, camera, frame, memory, log and journal state.</summary>
+/// <summary>A translucent overlay of seed, date, time control, camera, active atlas chunk and cache, frame, memory, log and journal state.</summary>
 public partial class DebugHud : PanelContainer
 {
     private Label _label = null!;
@@ -86,7 +92,9 @@ public partial class DebugHud : PanelContainer
 
         lines.AddRange(
         [
-            "active world chunk: unavailable — chunking arrives with SOV-P03-T07",
+            F($"active chunk: {model.ActiveChunk} ({model.ActiveResidency}) of {model.ActiveChunkField}"),
+            F($"overlay: {model.Overlay}"),
+            F($"cache: {model.Cache.ResidentChunks} chunks, {Megabytes(model.Cache.ResidentBytes)} of {Megabytes(model.Cache.BudgetBytes)}, loads {model.Cache.Loads}, evictions {model.Cache.Evictions}"),
             F($"camera centre: {model.CameraCentre}   {model.MetresPerPixel:0.###} m/px"),
             F($"fps: {model.Fps:0}   frame: {model.FrameMs:0.0} ms   advance: {model.LastAdvanceCostMs:0.000} ms/{model.LastAdvanceSteps} step(s)"),
             F($"managed heap: {Megabytes(model.ManagedHeapBytes)}   godot static: {Megabytes(model.GodotStaticBytes)}"),

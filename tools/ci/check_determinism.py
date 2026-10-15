@@ -16,7 +16,7 @@ import os
 import subprocess
 import sys
 
-COMPARED=('checksum','sim_time_ms','steps')
+COMPARED=('checksum','sim_time_ms','steps','atlas_probe')
 
 def summary_of(stdout):
     """The JSON object on the last stdout line that starts with '{'."""
@@ -30,6 +30,7 @@ def differences(first,second):
     """Compared fields that are missing or differ between two summaries."""
     problems=[]
     for key in COMPARED:
+        if key not in first and key not in second: continue  # a field neither run reports, such as atlas_probe from older builds
         if key not in first or key not in second: problems.append(f'{key} missing from the summary')
         elif first[key]!=second[key]: problems.append(f'{key} differs: {first[key]!r} then {second[key]!r}')
     return problems
@@ -60,7 +61,7 @@ def compare(directory):
             print(f'check_determinism: {fixture}: platforms disagree with {reference_name}:\n - '+'\n - '.join(problems),file=sys.stderr)
             failed=True
         else:
-            print(f'{fixture}: identical on {", ".join(summaries)}: '+', '.join(f'{key}={reference[key]}' for key in COMPARED))
+            print(f'{fixture}: identical on {", ".join(summaries)}: '+', '.join(f'{key}={reference[key]}' for key in COMPARED if key in reference))
     return 1 if failed else 0
 
 def main(argv=None):
@@ -83,11 +84,11 @@ def main(argv=None):
     if problems:
         print('check_determinism: two identical runs disagree:\n - '+'\n - '.join(problems),file=sys.stderr)
         return 1
-    line=', '.join(f'{key}={first[key]}' for key in COMPARED)
+    line=', '.join(f'{key}={first[key]}' for key in COMPARED if key in first)
     print(f'deterministic: {line}')
     if write:
         os.makedirs(os.path.dirname(os.path.abspath(write)),exist_ok=True)
-        with open(write,'w',encoding='utf-8') as out: json.dump({key:first[key] for key in COMPARED},out)
+        with open(write,'w',encoding='utf-8') as out: json.dump({key:first[key] for key in COMPARED if key in first},out)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'],'a',encoding='utf-8') as summary:
             summary.write(f'Determinism on {os.environ.get("RUNNER_OS","local")}: `{first["checksum"]}` after {first["steps"]} steps\n\n')

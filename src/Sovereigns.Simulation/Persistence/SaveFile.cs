@@ -1,5 +1,9 @@
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Sovereigns.Simulation.Atlas;
 using Sovereigns.Simulation.Diagnostics;
 using Sovereigns.Simulation.Events;
 using Sovereigns.Simulation.Identity;
@@ -11,6 +15,12 @@ using Sovereigns.Simulation.Time;
 
 namespace Sovereigns.Simulation.Persistence;
 
+/// <summary>One authoritative override of a native cell.</summary>
+public sealed record SavedOverride(long I, long J, IReadOnlyList<double> Values, SimTime At);
+
+/// <summary>A stored field's overrides at its native level, with the field's schema version (ADR-0009).</summary>
+public sealed record SavedField(string Field, int Schema, GridLevel Level, IReadOnlyList<SavedOverride> Overrides);
+
 /// <summary>Mutable authoritative state at the save time. Derived values, caches and host pacing are never saved.</summary>
 public sealed record SaveState(
     SimTime Now,
@@ -18,7 +28,9 @@ public sealed record SaveState(
     IReadOnlyDictionary<string, ulong> IdCounters,
     IReadOnlyList<DebugMarker> Markers,
     IReadOnlyList<Breakpoint> Breakpoints,
-    IReadOnlyList<PendingDecision> PendingDecisions);
+    IReadOnlyList<PendingDecision> PendingDecisions,
+    IReadOnlyList<SavedField> Fields,
+    IReadOnlyList<MapFeature> Features);
 
 /// <summary>Everything a save restores: immutable identity, mutable state and the event ledger (delta history).</summary>
 public sealed record SavePayload(WorldIdentity Identity, SaveState State, IReadOnlyList<WorldEvent> Ledger);
@@ -39,7 +51,22 @@ public sealed class SaveLoadException(IReadOnlyList<string> problems)
 public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion, string SavedAt, string PayloadSha256, SavePayload Payload)
 {
     public const string FormatName = "sovereigns-save";
-    public const int CurrentFormatVersion = 1;
+    public const int CurrentFormatVersion = 2;
+
+    /// <summary>
+    /// Declared migrations: the payload of format N becomes format N + 1. Each runs on the JSON after its integrity
+    /// was verified, and the hash is recomputed afterwards.
+    /// </summary>
+    private static readonly Dictionary<int, Action<JsonObject>> Migrations = new()
+    {
+        // Format 2 (Phase 03) adds stored field overrides and linear features; a format 1 world had neither.
+        [1] = payload =>
+        {
+            var state = payload["state"]!.AsObject();
+            state["fields"] = new JsonArray();
+            state["features"] = new JsonArray();
+        },
+    };
 
     /// <summary>Captures a world between operations. A faulted world has partial state and cannot be saved.</summary>
     public static SaveFile Capture(World world)
@@ -50,8 +77,15 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
             throw new InvalidOperationException("a faulted world has partial state and cannot be saved; write a failure report instead");
         }
 
+        var fields = world.Atlas.AllOverrides().GroupBy(entry => entry.Field).Select(group =>
+        {
+            var definition = FieldCatalog.Get(group.Key);
+            return new SavedField(group.Key, definition.Schema, definition.NativeLevel,
+                [.. group.Select(entry => new SavedOverride(entry.Cell.I, entry.Cell.J, entry.Override.Values, entry.Override.At))]);
+        }).ToList();
         var state = new SaveState(world.Now, world.Journal.NextSequence - 1, new SortedDictionary<string, ulong>(
-            world.Ids.Counters.ToDictionary(), StringComparer.Ordinal), [.. world.Markers], [.. world.Breakpoints], [.. world.PendingDecisions]);
+            world.Ids.Counters.ToDictionary(), StringComparer.Ordinal), [.. world.Markers], [.. world.Breakpoints], [.. world.PendingDecisions],
+            fields, [.. world.Features]);
         var payload = new SavePayload(world.Identity, state, [.. world.Ledger.Events]);
         return new SaveFile(FormatName, CurrentFormatVersion, world.Identity.RulesVersion, WorldCalendar.ToCalendar(world.Now).ToString(),
             Hash(payload), payload);
@@ -59,13 +93,41 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
 
     public void WriteTo(Stream stream) => JsonSerializer.Serialize(stream, this, SimJson.Indented);
 
-    /// <summary>Reads, verifies and restores a world. Throws <see cref="SaveLoadException"/> listing every problem.</summary>
+    /// <summary>
+    /// Reads, verifies, migrates and restores a world. Integrity is checked on the payload as written, before any
+    /// migration, so an older save is proven intact before it is converted. Throws <see cref="SaveLoadException"/>
+    /// listing every problem.
+    /// </summary>
     public static World Load(Stream stream, Logger? logger = null)
     {
+        JsonObject root;
+        try
+        {
+            root = JsonNode.Parse(stream)?.AsObject() ?? throw new JsonException("empty document");
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+            throw new SaveLoadException([$"not a readable save file: {ex.Message}"]);
+        }
+
+        var header = Header(root).ToList();
+        if (header.Count > 0)
+        {
+            throw new SaveLoadException(header);
+        }
+
+        for (var version = root["format_version"]!.GetValue<int>(); version < CurrentFormatVersion; version++)
+        {
+            var payload = root["payload"]!.AsObject();
+            Migrations[version](payload);
+            root["format_version"] = version + 1;
+            root["payload_sha256"] = Hash(payload);
+        }
+
         SaveFile? file;
         try
         {
-            file = JsonSerializer.Deserialize<SaveFile>(stream, SimJson.Options);
+            file = root.Deserialize<SaveFile>(SimJson.Options);
         }
         catch (JsonException ex)
         {
@@ -77,17 +139,19 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
             throw new SaveLoadException(["the save file is empty"]);
         }
 
-        var problems = file.Validate().ToList();
+        var problems = file.Validate(checkHash: false).ToList();
         if (problems.Count > 0)
         {
             throw new SaveLoadException(problems);
         }
 
         var state = file.Payload.State;
+        var overrides = state.Fields.SelectMany(field => field.Overrides.Select(cell =>
+            (field.Field, new GridCell(field.Level, cell.I, cell.J), new CellOverride(cell.Values, cell.At))));
         try
         {
             return World.Restore(file.Payload.Identity, state.Now, state.CommandsApplied, state.IdCounters, state.Markers,
-                state.Breakpoints, state.PendingDecisions, file.Payload.Ledger, file.PayloadSha256, logger);
+                state.Breakpoints, state.PendingDecisions, overrides, state.Features, file.Payload.Ledger, file.PayloadSha256, logger);
         }
         catch (InvalidOperationException ex)
         {
@@ -95,8 +159,45 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
         }
     }
 
+    /// <summary>Format, version and integrity of a save as written; empty when it may be migrated and read.</summary>
+    private static IEnumerable<string> Header(JsonObject root)
+    {
+        if (root["format"]?.GetValueKind() != JsonValueKind.String || root["format"]!.GetValue<string>() != FormatName)
+        {
+            yield return $"format is not '{FormatName}'";
+            yield break;
+        }
+
+        if (root["format_version"]?.GetValueKind() != JsonValueKind.Number || !root["format_version"]!.AsValue().TryGetValue<int>(out var version))
+        {
+            yield return "format_version is missing";
+            yield break;
+        }
+
+        if (version > CurrentFormatVersion)
+        {
+            yield return $"save format {version} is newer than this build (format {CurrentFormatVersion}); use a newer build";
+            yield break;
+        }
+
+        for (var step = version; step < CurrentFormatVersion; step++)
+        {
+            if (!Migrations.ContainsKey(step))
+            {
+                yield return $"save format {version} has no declared migration to format {CurrentFormatVersion}";
+                yield break;
+            }
+        }
+
+        if (root["payload"] is not JsonObject payload || root["payload_sha256"]?.GetValueKind() != JsonValueKind.String ||
+            Hash(payload) != root["payload_sha256"]!.GetValue<string>())
+        {
+            yield return "the payload does not match its SHA-256; the save is corrupted or was edited";
+        }
+    }
+
     /// <summary>Every reason this save cannot be loaded by this build; empty when it can.</summary>
-    public IEnumerable<string> Validate()
+    public IEnumerable<string> Validate(bool checkHash = true)
     {
         if (Format != FormatName)
         {
@@ -119,7 +220,7 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
             yield break;
         }
 
-        if (Hash(Payload) != PayloadSha256)
+        if (checkHash && Hash(Payload) != PayloadSha256)
         {
             yield return "the payload does not match its SHA-256; the save is corrupted or was edited";
             yield break;
@@ -221,6 +322,63 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
             }
         }
 
+        var fieldKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in state.Fields)
+        {
+            if (!FieldAtlas.StoredGridFields.Contains(field.Field) || !fieldKeys.Add(field.Field))
+            {
+                yield return $"state: field '{field.Field}' is not stored by this build, or appears twice";
+                continue;
+            }
+
+            var definition = FieldCatalog.Get(field.Field);
+            if (field.Schema != definition.Schema || field.Level != definition.NativeLevel)
+            {
+                yield return $"state: field '{field.Field}' was saved with schema {field.Schema} at {field.Level}; this build needs schema {definition.Schema} at {definition.NativeLevel} and declares no migration";
+                continue;
+            }
+
+            var (_, _, maxI, maxJ) = Grid.CellRange(field.Level, identity.Extent);
+            var components = definition.Kind == FieldKind.Vector ? 2 : 1;
+            var cells = new HashSet<(long, long)>();
+            foreach (var cell in field.Overrides)
+            {
+                if (cell.I < 0 || cell.J < 0 || cell.I > maxI || cell.J > maxJ || !cells.Add((cell.I, cell.J)))
+                {
+                    yield return $"state: field '{field.Field}' override at [{cell.I},{cell.J}] lies outside the world or appears twice";
+                }
+
+                if (cell.Values.Count != components || cell.Values.Any(value => !double.IsFinite(value) || !definition.InRange(value)) ||
+                    cell.At > state.Now || cell.At < identity.Start)
+                {
+                    yield return $"state: field '{field.Field}' override at [{cell.I},{cell.J}] has values outside {definition.Min}–{definition.Max} {definition.Unit} or a time outside the world's history";
+                }
+            }
+        }
+
+        var featureIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var feature in state.Features)
+        {
+            var parts = feature.Id.Split(':');
+            if (parts.Length != 2 || parts[0] != Kind.SurveyLine.Name ||
+                !ulong.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var number) ||
+                feature.Id != new EntityId<Kind.SurveyLine>(number).ToString() || number == 0 ||
+                number > Issued(Kind.SurveyLine.Name) || !featureIds.Add(feature.Id) || feature.Kind != FeatureKind.SurveyLine)
+            {
+                yield return $"state: feature '{feature.Id}' was never issued, appears twice, or is not a survey line";
+            }
+
+            if (World.SurveyLineProblem(feature.Points, feature.Label, identity.Extent) is { } problem)
+            {
+                yield return $"state: feature '{feature.Id}': {problem}";
+            }
+
+            if (feature.CreatedAt > state.Now || feature.CreatedAt < identity.Start)
+            {
+                yield return $"state: feature '{feature.Id}' was created at {feature.CreatedAt}, outside the world's history";
+            }
+        }
+
         var breakpointIds = new HashSet<ulong>();
         foreach (var breakpoint in state.Breakpoints)
         {
@@ -255,6 +413,14 @@ public sealed record SaveFile(string Format, int FormatVersion, int RulesVersion
         }
     }
 
+    /// <summary>SHA-256 of the canonical (compact) payload JSON.</summary>
     private static string Hash(SavePayload payload) =>
         Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(payload, SimJson.Options)));
+
+    /// <summary>
+    /// The same hash computed from a parsed payload, so that a save can be verified before it is migrated. Compact JSON
+    /// of a parsed document reproduces the serializer's bytes: member order, escaping and number text are preserved.
+    /// </summary>
+    private static string Hash(JsonObject payload) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(payload.ToJsonString(SimJson.Options))));
 }

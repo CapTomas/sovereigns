@@ -3,11 +3,14 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Sovereigns.Simulation;
+using Sovereigns.Simulation.Atlas;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Content;
 using Sovereigns.Simulation.Diagnostics;
+using Sovereigns.Simulation.Geometry;
 using Sovereigns.Simulation.Identity;
 using Sovereigns.Simulation.Persistence;
+using Sovereigns.Simulation.Random;
 using Sovereigns.Simulation.Scenarios;
 using Sovereigns.Simulation.Serialization;
 using Sovereigns.Simulation.Time;
@@ -37,6 +40,9 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
               and compares checksums, or reproduces the failing command or step.
           validate-content [--content <dir>] [--repo <dir>]
               Validates content definitions and prints actionable errors.
+          bench [--fixture <F-ID> | --scenario <content-id> --seed <n>] [--samples <n>] [--repo <dir>]
+              Measures atlas queries, chunk churn, aggregation and memory on a painted world (default F-EMPTY) and prints
+              JSON. Measurements only: budgets come from agreed reference hardware (QUALITY_BAR).
 
         Exit codes: 0 success, 1 simulation failure (report written), 2 usage or content error, 3 replay mismatch.
         """;
@@ -48,6 +54,7 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         ["run"] = ["fixture", "scenario", "seed", "load", "for-ms", "until-ms", "commands", "record", "save", "log", "reports", "fail-after-ms", "repo"],
         ["replay"] = ["save", "repo"],
         ["validate-content"] = ["content", "repo"],
+        ["bench"] = ["fixture", "scenario", "seed", "samples", "repo"],
     };
 
     public int Run(string[] args)
@@ -71,6 +78,7 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
                 "run" => RunWorld(options),
                 "replay" => ReplayReport(options),
                 "validate-content" => ValidateContent(options),
+                "bench" => Bench(options),
                 _ => throw new UsageException($"unknown command '{args[0]}'"),
             };
         }
@@ -246,6 +254,7 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         }
 
         var summary = new RunSummary(fixtureReference, world.ScenarioId.ToString(), world.Identity.Id.ToString(), world.BaseSaveSha256,
+            AtlasProbe(world),
             world.Seed, WorldCalendar.ToCalendar(world.Identity.Start).ToString(), WorldCalendar.ToCalendar(world.Now).ToString(),
             world.Now.Milliseconds, world.StepCount, world.Journal.Entries.Count, world.Markers.Count, world.Ledger.Count,
             world.PendingDecisions.Count, stoppedAtDecision, world.ComputeChecksum(), stepCost.Elapsed.TotalMilliseconds,
@@ -253,6 +262,115 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
         stdout.WriteLine(JsonSerializer.Serialize(summary, SimJson.Options));
         return Ok;
     }
+
+    /// <summary>SOV-P03-T16: atlas measurements on this machine. No thresholds; compare runs on the same hardware.</summary>
+    private int Bench(Options options)
+    {
+        var repo = RepoRoot(options);
+        LaunchSelection selection;
+        try
+        {
+            selection = LaunchSelection.Resolve(LoadContent(repo), Path.Combine(repo, "content"), Path.Combine(repo, "tests", "fixtures"), repo,
+                options.Get("scenario") is null ? options.Get("fixture") ?? "F-EMPTY" : null, options.Get("scenario"), options.Get("seed"), defaultSeed: 0);
+        }
+        catch (LaunchException ex)
+        {
+            throw new UsageException(ex.Message);
+        }
+
+        var samples = options.Get("samples") is { } text ? (int)ParseInt64(text, "--samples") : 100_000;
+        if (samples < 100)
+        {
+            throw new UsageException("--samples must be at least 100");
+        }
+
+        var world = World.Create(selection.Scenario, selection.Seed, Logger.None, NewWorldId());
+        var extent = world.Extent;
+        var strokes = RandomStream.For(selection.Seed, "bench.strokes");
+        for (var k = 0; k < 40; k++)
+        {
+            world.Submit(new PaintScratch(new WorldPoint(strokes.NextDouble() * extent.East, strokes.NextDouble() * extent.North),
+                50 + strokes.NextDouble() * 1_500, strokes.NextDouble()));
+        }
+
+        var heapBefore = GC.GetTotalMemory(forceFullCollection: true);
+        var cases = new List<BenchCase>();
+        void Measure(string name, string field, GridLevel? level, int count, long? budget = null)
+        {
+            world.Atlas.Unload();
+            world.Atlas.BudgetBytes = budget ?? FieldAtlas.DefaultBudgetBytes;
+            var points = RandomStream.For(selection.Seed, "bench.points");
+            var statsBefore = world.Atlas.CacheStatistics;
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: false);
+            var clock = Stopwatch.StartNew();
+            for (var k = 0; k < count; k++)
+            {
+                world.Atlas.Sample(field, new WorldPoint(points.NextDouble() * extent.East, points.NextDouble() * extent.North), level);
+            }
+
+            clock.Stop();
+            var stats = world.Atlas.CacheStatistics;
+            cases.Add(new BenchCase(name, count, clock.Elapsed.TotalMilliseconds, count / clock.Elapsed.TotalSeconds,
+                stats.Loads - statsBefore.Loads, stats.Evictions - statsBefore.Evictions, stats.ResidentBytes,
+                GC.GetTotalAllocatedBytes(precise: false) - allocatedBefore));
+        }
+
+        // Warm-up: compile every path once, then discard those cases.
+        foreach (var level in Enum.GetValues<GridLevel>())
+        {
+            Measure("warm-up", FieldCatalog.Scratch.Key, level, 2_000);
+            Measure("warm-up", FieldCatalog.ScratchGradient.Key, level, 2_000);
+        }
+
+        Measure("warm-up", FieldCatalog.Latitude.Key, null, 2_000);
+        cases.Clear();
+        Measure("latitude analytic", FieldCatalog.Latitude.Key, null, samples);
+        Measure("scratch local native", FieldCatalog.Scratch.Key, GridLevel.Local, samples);
+        Measure("scratch regional aggregate", FieldCatalog.Scratch.Key, GridLevel.Regional, samples);
+        Measure("scratch macro aggregate", FieldCatalog.Scratch.Key, GridLevel.Macro, samples);
+        Measure("scratch tactical refined", FieldCatalog.Scratch.Key, GridLevel.Tactical, samples);
+        Measure("gradient local derived", FieldCatalog.ScratchGradient.Key, GridLevel.Local, samples);
+        Measure("scratch local, 1 MiB cache (churn)", FieldCatalog.Scratch.Key, GridLevel.Local, samples, budget: 1024 * 1024);
+
+        // The whole-world aggregate visits every local chunk; a poller records the managed heap's peak meanwhile, which
+        // shows whether memory stays near the cache budget rather than growing with the world.
+        world.Atlas.Unload();
+        world.Atlas.BudgetBytes = FieldAtlas.DefaultBudgetBytes;
+        var heapBeforeAggregate = GC.GetTotalMemory(forceFullCollection: true);
+        var peak = heapBeforeAggregate;
+        var aggregating = true;
+        var poller = new Thread(() =>
+        {
+            while (Volatile.Read(ref aggregating))
+            {
+                Interlocked.Exchange(ref peak, Math.Max(Interlocked.Read(ref peak), GC.GetTotalMemory(forceFullCollection: false)));
+                Thread.Sleep(1);
+            }
+        });
+        poller.Start();
+        var aggregateClock = Stopwatch.StartNew();
+        var whole = world.Atlas.Aggregate(FieldCatalog.Scratch.Key, 0, 0, extent.East, extent.North);
+        aggregateClock.Stop();
+        Volatile.Write(ref aggregating, false);
+        poller.Join();
+        var heapAfter = GC.GetTotalMemory(forceFullCollection: true);
+        var summary = new BenchSummary(selection.FixtureReference, world.ScenarioId.ToString(), world.Seed, extent.East, extent.North,
+            Environment.ProcessorCount, System.Runtime.InteropServices.RuntimeInformation.OSDescription, cases,
+            new BenchAggregate(whole.Cells, aggregateClock.Elapsed.TotalMilliseconds, whole.Mean, peak - heapBeforeAggregate),
+            heapBefore, heapAfter, world.Atlas.CacheStatistics.ResidentBytes, world.Atlas.OverrideCount(FieldCatalog.Scratch.Key));
+        stdout.WriteLine(JsonSerializer.Serialize(summary, SimJson.Options));
+        return Ok;
+    }
+
+    private sealed record BenchCase(string Name, int Samples, double ElapsedMs, double SamplesPerSecond, long ChunkLoads, long ChunkEvictions,
+        long ResidentBytes, long AllocatedBytes);
+
+    /// <param name="PeakHeapGrowthBytes">Largest managed-heap growth observed while aggregating, sampled every millisecond.</param>
+    private sealed record BenchAggregate(long Cells, double ElapsedMs, double Mean, long PeakHeapGrowthBytes);
+
+    private sealed record BenchSummary(string? Fixture, string Scenario, ulong Seed, double ExtentEastM, double ExtentNorthM, int Processors,
+        string Os, IReadOnlyList<BenchCase> Cases, BenchAggregate WholeWorldAggregate, long ManagedHeapBeforeBytes, long ManagedHeapAfterBytes,
+        long CacheResidentBytes, int StoredOverrides);
 
     private int WriteFailureReport(World world, Exception ex, RecentLogBuffer recent, string reports)
     {
@@ -472,11 +590,43 @@ internal sealed class HeadlessApp(TextWriter stdout, TextWriter stderr)
             ? value
             : throw new UsageException($"{option} must be a whole number, found '{text}'");
 
+    /// <summary>
+    /// SHA-256 over atlas samples on a fixed 16 × 16 lattice at every level: latitude, scratch and its gradient. These are
+    /// derived values computed with basic arithmetic only, so they must match across platforms (ADR-0004 §3, ADR-0009).
+    /// Local solar time is excluded because it uses a transcendental function.
+    /// </summary>
+    private static string AtlasProbe(World world)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[8];
+        foreach (var level in Enum.GetValues<GridLevel>())
+        {
+            for (var row = 0; row < 16; row++)
+            {
+                for (var column = 0; column < 16; column++)
+                {
+                    var point = new WorldPoint(world.Extent.East * (column + 0.37) / 16, world.Extent.North * (row + 0.61) / 16);
+                    foreach (var field in new[] { FieldCatalog.Latitude.Key, FieldCatalog.Scratch.Key, FieldCatalog.ScratchGradient.Key })
+                    {
+                        foreach (var value in world.Atlas.Sample(field, point, level).Values ?? [])
+                        {
+                            System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(buffer, BitConverter.DoubleToInt64Bits(value));
+                            hash.AppendData(buffer);
+                        }
+                    }
+                }
+            }
+        }
+
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
+    }
+
     private sealed record RunSummary(
         string? Fixture,
         string Scenario,
         string WorldId,
         string? BaseSave,
+        string AtlasProbe,
         ulong Seed,
         string Start,
         string Now,

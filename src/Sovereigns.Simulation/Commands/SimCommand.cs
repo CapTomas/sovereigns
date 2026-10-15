@@ -17,6 +17,9 @@ namespace Sovereigns.Simulation.Commands;
 [JsonDerivedType(typeof(RemoveMarker), "remove_marker")]
 [JsonDerivedType(typeof(SetBreakpoint), "set_breakpoint")]
 [JsonDerivedType(typeof(AcknowledgeDecision), "acknowledge_decision")]
+[JsonDerivedType(typeof(PaintScratch), "paint_scratch")]
+[JsonDerivedType(typeof(DrawSurveyLine), "draw_survey_line")]
+[JsonDerivedType(typeof(RemoveSurveyLine), "remove_survey_line")]
 [JsonDerivedType(typeof(Pause), "pause")]
 [JsonDerivedType(typeof(Resume), "resume")]
 [JsonDerivedType(typeof(SetSpeed), "set_speed")]
@@ -37,6 +40,25 @@ public sealed record SetBreakpoint(SimTime At, string Label) : SimCommand;
 
 /// <summary>Resolve a pending decision so that time may advance again.</summary>
 public sealed record AcknowledgeDecision(EntityId<Kind.Event> Decision) : SimCommand;
+
+/// <summary>Set the developer scratch field (0–1) in every local cell whose centre lies within the radius.</summary>
+public sealed record PaintScratch(WorldPoint Centre, double RadiusM, double Value) : SimCommand
+{
+    public const double MaxRadiusM = 5_000;
+}
+
+/// <summary>Draw a developer survey line: 2 to 256 points inside the world.</summary>
+public sealed record DrawSurveyLine(IReadOnlyList<WorldPoint> Points, string Label) : SimCommand
+{
+    public const int MaxPoints = 256;
+
+    public bool Equals(DrawSurveyLine? other) =>
+        other is not null && Label == other.Label && Points.SequenceEqual(other.Points);
+
+    public override int GetHashCode() => HashCode.Combine(Label, Points.Count);
+}
+
+public sealed record RemoveSurveyLine(EntityId<Kind.SurveyLine> Line) : SimCommand;
 
 /// <summary>Commands that change only host pacing (<see cref="Kernel.TimeControl"/>), never world state; see <see cref="World.Control"/>.</summary>
 public abstract record ControlCommand : SimCommand;

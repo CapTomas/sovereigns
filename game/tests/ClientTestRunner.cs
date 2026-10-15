@@ -37,7 +37,7 @@ public partial class ClientTestRunner : Node
             GetWindow().ContentScaleMode = Window.ContentScaleModeEnum.Viewport;
             GetWindow().ContentScaleSize = new Vector2I(1600, 900);
             await Frames(2);
-            var cases = ViewTests.Cases().Concat(LaunchTests.Cases()).Concat(PacingTests.Cases()).Concat(TimeControlTests.Cases()).Concat(PanelTests.Cases()).Concat(InputTests.Cases()).Concat(new ShellTests(this).Cases());
+            var cases = ViewTests.Cases().Concat(LaunchTests.Cases()).Concat(PacingTests.Cases()).Concat(TimeControlTests.Cases()).Concat(PanelTests.Cases()).Concat(AtlasViewTests.Cases()).Concat(InputTests.Cases()).Concat(new ShellTests(this).Cases());
             foreach (var testCase in cases)
             {
                 try

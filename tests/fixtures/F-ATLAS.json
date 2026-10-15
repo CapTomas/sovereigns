@@ -1,0 +1,9 @@
+{
+  "id": "F-ATLAS",
+  "version": 1,
+  "status": "defined",
+  "purpose": "Field atlas determinism: developer scratch strokes (overlapping, erased) and survey lines (drawn, removed) on the empty world within the first half hour, so state checksums and the atlas probe of sampled values at every level can be compared across platforms. Phase 03 evidence.",
+  "seed": 20261014,
+  "scenario": "content/core/scenario/empty_world.json",
+  "commands": "tests/fixtures/F-ATLAS.commands.jsonl"
+}

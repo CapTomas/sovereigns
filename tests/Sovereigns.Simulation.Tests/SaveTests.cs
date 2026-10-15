@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Sovereigns.Simulation.Atlas;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Geometry;
 using Sovereigns.Simulation.Identity;
@@ -48,7 +49,7 @@ public sealed class SaveTests
 
     [Theory]
     [InlineData("format", "\"other-save\"", "is not 'sovereigns-save'")]
-    [InlineData("format_version", "2", "newer than this build")]
+    [InlineData("format_version", "3", "newer than this build")]
     [InlineData("format_version", "0", "no declared migration")]
     [InlineData("rules_version", "999", "rules version 999")]
     public void HeaderMismatchesAreRefused(string field, string value, string expected)
@@ -80,6 +81,107 @@ public sealed class SaveTests
         world.Submit(new SetBreakpoint(world.Now.Plus(50 * Day), "later"));
         var json = JsonNode.Parse(Save(world))!;
         json["payload"]!["state"]![collection]![0]![member] = JsonNode.Parse(value);
+        Rehash(json);
+
+        var error = Assert.Throws<SaveLoadException>(() => SaveFile.Load(Stream(json)));
+        Assert.Contains(expected, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AtlasStateSurvivesSaveAndLoad()
+    {
+        var world = World.Create(TestSupport.Scenario(), seed: 8);
+        world.Submit(new PaintScratch(new WorldPoint(2_000, 2_000), 300, 0.75));
+        world.Submit(new DrawSurveyLine([new WorldPoint(100, 100), new WorldPoint(5_000, 3_000), new WorldPoint(9_000, 100)], "ridge"));
+        world.AdvanceTo(new SimTime(Day));
+        var point = new WorldPoint(2_100, 1_950);
+
+        var loaded = SaveFile.Load(new MemoryStream(Save(world)));
+
+        Assert.Equal(world.ComputeChecksum(), loaded.ComputeChecksum());
+        Assert.Equal(world.Atlas.Sample("scratch", point).Values, loaded.Atlas.Sample("scratch", point).Values);
+        Assert.Equal(world.Atlas.Sample("scratch_gradient", point).Values, loaded.Atlas.Sample("scratch_gradient", point).Values);
+        Assert.Equal(world.Features[0].Points, loaded.Features[0].Points);
+        Assert.Equal(world.Features[0].Id, loaded.Features[0].Id);
+    }
+
+    [Fact]
+    public void AFormatOneSaveMigratesAndContinuesLikeTheUninterruptedRun()
+    {
+        // SOV-P03-T15: a real Phase 02 save (F-KERNEL on day 20, format 1) loads through the declared migration,
+        // and continuing the fixture's journal reaches the same state as running the fixture in one go.
+        var repo = TestSupport.RepoRoot;
+        using var stream = File.OpenRead(Path.Combine(repo, "tests", "Sovereigns.Simulation.Tests", "Data", "save-format1-F-KERNEL-day20.json"));
+        var loaded = SaveFile.Load(stream);
+        var journal = CommandJournal.ReadJsonLines(new StringReader(File.ReadAllText(Path.Combine(repo, "tests", "fixtures", "F-KERNEL.commands.jsonl"))), "F-KERNEL");
+        var catalog = Content.ContentCatalog.Load(TestSupport.ContentRoot).Catalog;
+        var scenario = catalog.Get<Scenarios.ScenarioDefinition>(Content.ContentId.Parse("core:scenario/kernel_year"));
+        var end = scenario.StartTime.Plus(scenario.DurationMs);
+
+        var continued = Replay.Continue(loaded, [.. journal.Where(entry => entry.Sequence >= loaded.Journal.NextSequence)], end);
+        var uninterrupted = Replay.Run(scenario, 20261014, journal, end);
+
+        Assert.Equal(WorldCalendar.FromCalendar(1202, 12, 5, 6), loaded.Identity.Start.Plus(20 * Day));
+        Assert.Empty(loaded.Features);
+        Assert.Equal(uninterrupted.ComputeChecksum(), continued.ComputeChecksum());
+    }
+
+    [Theory]
+    [InlineData("field", "\"elevation\"", "is not stored by this build")]
+    [InlineData("schema", "2", "schema 2")]
+    [InlineData("level", "\"regional\"", "at Regional")]
+    public void FieldDataThisBuildCannotHonourIsRefused(string member, string value, string expected)
+    {
+        var world = World.Create(TestSupport.Scenario(), seed: 8);
+        world.Submit(new PaintScratch(new WorldPoint(2_000, 2_000), 50, 0.5));
+        var json = JsonNode.Parse(Save(world))!;
+        json["payload"]!["state"]!["fields"]![0]![member] = JsonNode.Parse(value);
+        Rehash(json);
+
+        var error = Assert.Throws<SaveLoadException>(() => SaveFile.Load(Stream(json)));
+        Assert.Contains(expected, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ChangeTimesSurviveSaveAndLoadIncludingErasures()
+    {
+        var world = World.Create(TestSupport.Scenario(), seed: 8);
+        world.Submit(new PaintScratch(new WorldPoint(2_000, 2_000), 300, 0.75));
+        world.AdvanceTo(new SimTime(Day));
+        world.Submit(new PaintScratch(new WorldPoint(2_100, 2_000), 100, 0));
+
+        var loaded = SaveFile.Load(new MemoryStream(Save(world)));
+
+        foreach (var level in Enum.GetValues<GridLevel>())
+        {
+            foreach (var field in new[] { "scratch", "scratch_gradient" })
+            {
+                foreach (var point in new WorldPoint[] { new(2_100, 2_000), new(1_850, 2_000), new(5_000, 5_000) })
+                {
+                    Assert.Equal(world.Atlas.Sample(field, point, level).ChangedAt, loaded.Atlas.Sample(field, point, level).ChangedAt);
+                }
+            }
+        }
+
+        Assert.Equal(new SimTime(Day), loaded.Atlas.Sample("scratch", new WorldPoint(2_100, 2_000)).ChangedAt);
+    }
+
+    [Theory]
+    [InlineData("features", "id", "\"survey:01\"", "was never issued")]
+    [InlineData("features", "label", "\"a\\u0001b\"", "without control characters")]
+    [InlineData("features", "points", "[{\"x\": 100, \"y\": 100}, {\"x\": 100, \"y\": 100}]", "distinct consecutive points")]
+    [InlineData("features", "created_at", "-1000", "outside the world's history")]
+    [InlineData("overrides", "at", "-1000", "a time outside the world's history")]
+    public void AtlasRecordsThatBreakTheirRulesAreReported(string section, string member, string value, string expected)
+    {
+        var world = World.Create(TestSupport.Scenario(), seed: 8);
+        world.AdvanceTo(new SimTime(Day));
+        world.Submit(new PaintScratch(new WorldPoint(2_000, 2_000), 50, 0.5));
+        world.Submit(new DrawSurveyLine([new WorldPoint(100, 100), new WorldPoint(900, 100)], "road"));
+        var json = JsonNode.Parse(Save(world))!;
+        var state = json["payload"]!["state"]!;
+        var target = section == "features" ? state["features"]![0]! : state["fields"]![0]!["overrides"]![0]!;
+        target[member] = JsonNode.Parse(value);
         Rehash(json);
 
         var error = Assert.Throws<SaveLoadException>(() => SaveFile.Load(Stream(json)));

@@ -2,6 +2,7 @@ using Sovereigns.Client.Boot;
 using Sovereigns.Client.Controls;
 using Sovereigns.Client.Ui;
 using Sovereigns.Client.View;
+using Sovereigns.Simulation.Atlas;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Diagnostics;
 using Sovereigns.Simulation.Fields;
@@ -12,7 +13,7 @@ using Sovereigns.Simulation.Time;
 namespace Sovereigns.Client.Tests;
 
 /// <summary>Boots the real Main scene and drives it through the real input path.</summary>
-public sealed class ShellTests(ClientTestRunner runner)
+public sealed partial class ShellTests(ClientTestRunner runner)
 {
     private const string MainScene = "res://scenes/Main.tscn";
 
@@ -20,12 +21,13 @@ public sealed class ShellTests(ClientTestRunner runner)
     [
         new("shell: boots F-EMPTY and reports its seed and scenario in the HUD", BootsFixture),
         new("shell: select and place marker through input are journaled and replay to the same checksum", InputIsJournaledAndReplays),
-        new("shell: layers list every family, unavailable layers show No data, and the inspector lists 16 families", LayersAndInspector),
+        new("shell: layers list every field by family, unavailable layers show No data, and the inspector lists 17 families", LayersAndInspector),
         new("shell: wheel zoom anchors at the cursor, middle-drag pans and recenter fits the world", CameraInput),
         new("shell: a bad launch argument or scenario is shown, not fatal", LaunchProblemsAreShown),
         new("shell: time actions set pause, step and speed on the world's time control, never enter the journal, and are kept in the input history", TimeActionsControlPacing),
         new("shell: --paused and --speed start the world paused at the chosen speed", StartupTimeOptions),
         new("shell: B stops time at the next midnight even at 1 week/s, shows the pending decision, and Enter acknowledges it", BreakpointStopsTimeUntilAcknowledged),
+        .. AtlasCases(),
         new("shell: an injected failure writes a report, stops the host and shows a banner; replay reproduces it", FailureIsReported),
         new("shell: freeing the shell returns the orphan node count to its baseline and shuts down cleanly", NoOrphansAfterFree),
         new("shell: the close request and the quit action each log the shutdown checksum and request exit (must run last)", CloseAndQuit),
@@ -73,7 +75,8 @@ public sealed class ShellTests(ClientTestRunner runner)
             Check.True(!hud.Contains("SOV-P02-T11", StringComparison.Ordinal), "the time-controls placeholder is gone");
             Check.Contains(main.Shell.Events.Title, "Recent events (1 of 1)", "events panel title");
             Check.Contains(main.Shell.Events.Lines[0].Text, "WorldCreated", "events panel lists the creation event");
-            Check.Contains(hud, "active world chunk: unavailable", "HUD chunk line");
+            Check.Contains(hud, "active chunk: local chunk (48, 48) (Unloaded) of scratch", "HUD chunk line: the chunk under the camera centre, not yet resident");
+            Check.Contains(hud, "cache: 0 chunks, 0.0 MiB of 64.0 MiB, loads 0, evictions 0", "HUD cache line");
             Check.Contains(hud, "state checksum: ", "HUD checksum");
             Check.Contains(main.Shell.Status.HelpText, "Select: LMB", "help line from the bindings");
         }
@@ -150,25 +153,25 @@ public sealed class ShellTests(ClientTestRunner runner)
         try
         {
             var shell = main.Shell!;
-            Check.Equal(FieldFamilies.All.Count + 1, MapLayers.All.Count, "layer list: two drawable layers plus every family except geographic reference");
-            Check.Equal(2, MapLayers.All.Count(layer => layer.IsAvailable), "two layers available");
-            Check.True(MapLayers.All.Where(layer => !layer.IsAvailable).All(layer => layer.ListText.EndsWith("(unavailable)", StringComparison.Ordinal)), "unavailable layers are marked");
+            Check.Equal(2 + FieldCatalog.All.Count, shell.Layers.Count, "layer list: the world frame, the markers and every atlas field");
+            Check.Equal(2 + 4, shell.Layers.Count(layer => layer.IsAvailable), "two base layers and the four available fields are drawable");
+            Check.True(shell.Layers.Where(layer => !layer.IsAvailable).All(layer => layer.ListText.Contains("(unavailable — ", StringComparison.Ordinal)), "unavailable layers are marked");
 
             Click(shell.Map.GlobalPosition + (shell.Map.Size / 2));
             await runner.Frames(2);
             shell.RefreshPanels();
             var inspection = shell.Inspector.Current!;
-            Check.Equal(16, inspection.Families.Count, "inspector lists every family");
+            Check.Equal(17, inspection.Families.Count, "inspector lists every family and the developer tools");
             Check.Equal(15, inspection.Families.Count(family => family.Availability == FieldAvailability.Unavailable), "fifteen unavailable families");
             var text = string.Join('\n', shell.Inspector.Lines.Select(line => line.Text));
-            foreach (var family in FieldFamilies.All)
+            foreach (var family in FieldFamilies.All.Append(FieldCatalog.Developer))
             {
                 Check.Contains(text, family.Name, "inspector shows family");
             }
 
             Check.True(shell.Inspector.Lines.Any(line => line.Style == LineStyle.Dim && line.Text.Contains("Phase 07", StringComparison.Ordinal)), "unavailable readings are dim and name their phase");
             Check.True(shell.Inspector.Lines.Any(line => line.Text.Contains("owner: World foundation", StringComparison.Ordinal)) &&
-                shell.Inspector.Lines.Any(line => line.Text.Contains("derivation: φ = φ₀", StringComparison.Ordinal)), "readings list their provenance");
+                shell.Inspector.Lines.Any(line => line.Text.Contains("classification: analytic: φ = φ₀", StringComparison.Ordinal)), "readings list their provenance");
             Check.True(!text.Contains("fake", StringComparison.OrdinalIgnoreCase), "no invented values");
 
             Check.Equal(MapLayer.WorldFrameKey, shell.ActiveLayer.Key, "starts on the world frame layer");
@@ -177,12 +180,21 @@ public sealed class ShellTests(ClientTestRunner runner)
             Check.Equal(MapLayer.DeveloperMarkersKey, shell.ActiveLayer.Key, "layer_next selects the next layer");
             Press(Key.Bracketright);
             await runner.Frames(2);
-            Check.True(!shell.ActiveLayer.IsAvailable, "third layer is unavailable");
+            Check.Equal(FieldCatalog.Latitude.Key, shell.ActiveLayer.Key, "the next layer is the first atlas field, latitude, which is drawable");
+            Check.True(shell.ActiveLayer.IsFieldOverlay, "latitude is drawn as an overlay");
+            Check.True(shell.Legend.Text.Contains("level: macro (4.096 km)", StringComparison.Ordinal), "its legend names the level");
+
+            shell.SetLayer(shell.Layers.ToList().FindIndex(layer => !layer.IsAvailable));
+            await runner.Frames(2);
+            Check.True(!shell.ActiveLayer.IsAvailable, "an unavailable layer can be selected");
             Check.Contains(shell.Legend.Text, "No data — unavailable:", "legend names the missing data");
             Check.Contains(shell.Legend.Text, shell.ActiveLayer.UnavailableReason!, "legend gives owner and phase");
+            Check.True(shell.Map.Overlay is null, "an unavailable layer has no overlay to draw");
+            shell.SetLayer(1);
             Press(Key.Bracketleft);
             await runner.Frames(1);
-            Check.Equal(MapLayer.DeveloperMarkersKey, shell.ActiveLayer.Key, "layer_previous returns");
+            Check.Equal(MapLayer.WorldFrameKey, shell.ActiveLayer.Key, "layer_previous steps back");
+            shell.SetLayer(1);
 
             Press(Key.F3);
             await runner.Frames(1);
@@ -509,11 +521,11 @@ public sealed class ShellTests(ClientTestRunner runner)
     private void PushMotion(Vector2 position, Vector2 relative) =>
         runner.GetViewport().PushInput(new InputEventMouseMotion { Position = position, GlobalPosition = position, Relative = relative, ButtonMask = MouseButtonMask.Middle }, inLocalCoords: true);
 
-    private void Press(Key key)
+    private void Press(Key key, bool shift = false)
     {
         foreach (var pressed in new[] { true, false })
         {
-            runner.GetViewport().PushInput(new InputEventKey { Keycode = key, Pressed = pressed }, inLocalCoords: true);
+            runner.GetViewport().PushInput(new InputEventKey { Keycode = key, ShiftPressed = shift, Pressed = pressed }, inLocalCoords: true);
         }
     }
 }

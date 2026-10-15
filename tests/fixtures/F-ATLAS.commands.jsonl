@@ -1,0 +1,8 @@
+{"sequence":1,"at":37911391200000,"command":{"type":"paint_scratch","centre":{"x":30000,"y":40000},"radius_m":1500,"value":0.8}}
+{"sequence":2,"at":37911391200000,"command":{"type":"paint_scratch","centre":{"x":31000,"y":41000},"radius_m":600,"value":0.3}}
+{"sequence":3,"at":37911391800000,"command":{"type":"paint_scratch","centre":{"x":70000,"y":20000},"radius_m":900,"value":1.0}}
+{"sequence":4,"at":37911391800000,"command":{"type":"draw_survey_line","points":[{"x":20000,"y":20000},{"x":50000,"y":60000},{"x":90000,"y":55000}],"label":"old road"}}
+{"sequence":5,"at":37911392400000,"command":{"type":"paint_scratch","centre":{"x":50000,"y":60000},"radius_m":3000,"value":0.45}}
+{"sequence":6,"at":37911392400000,"command":{"type":"draw_survey_line","points":[{"x":5000,"y":95000},{"x":95000,"y":5000}],"label":"diagonal"}}
+{"sequence":7,"at":37911393000000,"command":{"type":"paint_scratch","centre":{"x":30000,"y":40000},"radius_m":400,"value":0.0}}
+{"sequence":8,"at":37911393000000,"command":{"type":"remove_survey_line","line":1}}

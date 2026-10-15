@@ -37,6 +37,19 @@ public static class InputActions
     public const string TimeSpeed5 = "time_speed_5";
     public const string SetBreakpoint = "set_breakpoint";
     public const string AcknowledgeDecision = "acknowledge_decision";
+    public const string LevelCoarser = "level_coarser";
+    public const string LevelFiner = "level_finer";
+    public const string ToggleSurveyLines = "toggle_survey_lines";
+    public const string ToggleResidency = "toggle_residency";
+    public const string PaintScratch = "paint_scratch";
+    public const string PaintRadiusUp = "paint_radius_up";
+    public const string PaintRadiusDown = "paint_radius_down";
+    public const string PaintValueUp = "paint_value_up";
+    public const string PaintValueDown = "paint_value_down";
+    public const string SurveyAddPoint = "survey_add_point";
+    public const string SurveyFinish = "survey_finish";
+    public const string SurveyCancel = "survey_cancel";
+    public const string SurveyRemove = "survey_remove";
     public const string Quit = "quit";
 
     /// <summary>The speed actions in preset order; action <c>i</c> selects <c>TimeControl.Presets[i]</c>.</summary>
@@ -82,6 +95,19 @@ public static class InputActions
         new(TimeSpeed5, "Run at 1 simulated week per real second", ["key:Key5"]),
         new(SetBreakpoint, "Stop time at the next standard-time midnight until acknowledged", ["key:B"]),
         new(AcknowledgeDecision, "Acknowledge the oldest pending decision so time can continue", ["key:Enter"]),
+        new(LevelCoarser, "Sample and inspect at the next coarser atlas level (automatic after macro)", ["key:Pageup"]),
+        new(LevelFiner, "Sample and inspect at the next finer atlas level (automatic after tactical)", ["key:Pagedown"]),
+        new(ToggleSurveyLines, "Show or hide survey lines", ["key:V"]),
+        new(ToggleResidency, "Show or hide the chunk-residency overlay", ["key:C"]),
+        new(PaintScratch, "Paint the developer scratch field at the cursor with the current radius and value", ["key:P"]),
+        new(PaintRadiusUp, "Increase the scratch paint radius", ["key:Shift+Equal"]),
+        new(PaintRadiusDown, "Decrease the scratch paint radius", ["key:Shift+Minus"]),
+        new(PaintValueUp, "Raise the scratch paint value by 0.1", ["key:Shift+Bracketright"]),
+        new(PaintValueDown, "Lower the scratch paint value by 0.1", ["key:Shift+Bracketleft"]),
+        new(SurveyAddPoint, "Add the cursor position to the survey line being drawn", ["key:L"]),
+        new(SurveyFinish, "Draw the pending survey line (at least two points)", ["key:K"]),
+        new(SurveyCancel, "Drop the pending survey line", ["key:J"]),
+        new(SurveyRemove, "Remove the survey line nearest the selected location", ["key:X"]),
         new(Quit, "Quit the client", ["key:Ctrl+Q", "key:Meta+Q"]),
     ];
 
@@ -100,6 +126,12 @@ public static class InputActions
         new("Speed", [TimeSpeed1, TimeSpeed2, TimeSpeed3, TimeSpeed4, TimeSpeed5]),
         new("Breakpoint", [SetBreakpoint]),
         new("Acknowledge", [AcknowledgeDecision]),
+        new("Level coarser/finer", [LevelCoarser, LevelFiner]),
+        new("Survey lines/residency", [ToggleSurveyLines, ToggleResidency]),
+        new("Paint", [PaintScratch]),
+        new("Radius -/+", [PaintRadiusDown, PaintRadiusUp]),
+        new("Value -/+", [PaintValueDown, PaintValueUp]),
+        new("Survey add/finish/cancel/remove", [SurveyAddPoint, SurveyFinish, SurveyCancel, SurveyRemove]),
         new("HUD", [ToggleHud]),
         new("Report", [FailureReport]),
         new("Quit", [Quit]),

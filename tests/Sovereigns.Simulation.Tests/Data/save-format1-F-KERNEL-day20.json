@@ -1,0 +1,161 @@
+{
+  "format": "sovereigns-save",
+  "format_version": 1,
+  "rules_version": 1,
+  "saved_at": "1202-12-05T06:00:00.000",
+  "payload_sha256": "b025116ad4ba85a87798cdf051d3e9f6251787b99c1001f114613bfe36ec9a32",
+  "payload": {
+    "identity": {
+      "id": "8fcd178fb917f4c579dd73c90945e2ad",
+      "seed": 20261014,
+      "scenario": "core:scenario/kernel_year",
+      "rules_version": 1,
+      "generator_version": 0,
+      "extent": {
+        "east": 100000,
+        "north": 100000
+      },
+      "geography": {
+        "south_edge_latitude_rad": 0.8290313946973066,
+        "standard_meridian_x": 50000
+      },
+      "step_ms": 1000,
+      "start": 37902232800000
+    },
+    "state": {
+      "now": 37903960800000,
+      "commands_applied": 4,
+      "id_counters": {
+        "breakpoint": 1,
+        "event": 7,
+        "marker": 2
+      },
+      "markers": [
+        {
+          "id": 1,
+          "position": {
+            "x": 20000,
+            "y": 30000
+          },
+          "label": "camp",
+          "placed_at": 37902232800000
+        },
+        {
+          "id": 2,
+          "position": {
+            "x": 61000,
+            "y": 47000
+          },
+          "label": "ford",
+          "placed_at": 37902236400000
+        }
+      ],
+      "breakpoints": [],
+      "pending_decisions": []
+    },
+    "ledger": [
+      {
+        "id": 1,
+        "at": 37902232800000,
+        "type": "world_created",
+        "cause": {
+          "kind": "origin"
+        },
+        "subjects": [],
+        "data": {
+          "scenario": "core:scenario/kernel_year",
+          "rules_version": "1"
+        }
+      },
+      {
+        "id": 2,
+        "at": 37902232800000,
+        "type": "marker_placed",
+        "cause": {
+          "kind": "command",
+          "command_sequence": 1
+        },
+        "subjects": [
+          "marker:1"
+        ],
+        "data": {
+          "label": "camp",
+          "position": "(20000 m E, 30000 m N)"
+        }
+      },
+      {
+        "id": 3,
+        "at": 37902236400000,
+        "type": "marker_placed",
+        "cause": {
+          "kind": "command",
+          "command_sequence": 2
+        },
+        "subjects": [
+          "marker:2"
+        ],
+        "data": {
+          "label": "ford",
+          "position": "(61000 m E, 47000 m N)"
+        }
+      },
+      {
+        "id": 4,
+        "at": 37903096800000,
+        "type": "breakpoint_set",
+        "cause": {
+          "kind": "command",
+          "command_sequence": 3
+        },
+        "subjects": [
+          "breakpoint:1"
+        ],
+        "data": {
+          "at": "1202-12-05T06:00:00.000",
+          "label": "muster"
+        }
+      },
+      {
+        "id": 5,
+        "at": 37903593600000,
+        "type": "season_began",
+        "cause": {
+          "kind": "system",
+          "system": "calendar"
+        },
+        "subjects": [],
+        "data": {
+          "season": "Winter",
+          "hemisphere": "Northern"
+        }
+      },
+      {
+        "id": 6,
+        "at": 37903960800000,
+        "type": "decision_raised",
+        "cause": {
+          "kind": "event",
+          "parent_event": 4
+        },
+        "subjects": [
+          "breakpoint:1"
+        ],
+        "data": {
+          "label": "muster"
+        }
+      },
+      {
+        "id": 7,
+        "at": 37903960800000,
+        "type": "decision_acknowledged",
+        "cause": {
+          "kind": "command",
+          "command_sequence": 4
+        },
+        "subjects": [
+          "event:6"
+        ]
+      }
+    ]
+  }
+}

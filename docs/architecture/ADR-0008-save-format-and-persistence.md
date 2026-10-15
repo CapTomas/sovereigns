@@ -30,7 +30,7 @@ Payload JSON is deterministic: fixed member order, shortest round-trip number fo
 
 Loading checks, in order, and reports every problem it finds instead of stopping at the first:
 
-1. The `format` name. A newer `format_version` is refused ("use a newer build"). An older one needs a declared migration chain, `format_version` N → N+1, applied in order; none exists yet.
+1. The `format` name. A newer `format_version` is refused ("use a newer build"). An older one needs a declared migration chain, `format_version` N → N+1, applied in order. Format 2 (Phase 03) adds field overrides and features; the declared 1 → 2 migration adds them empty (ADR-0009). Integrity (rule 3) is verified on the payload as written, before any migration runs.
 2. `rules_version` must equal this build's `SimulationRules.Version`. A save from other rules needs a declared migration, or it is refused with the reason. Outcomes are never silently recomputed under new rules.
 3. `payload_sha256` must match the recomputed hash of the canonical payload. A mismatch means corruption or editing.
 4. The identity's `generator_version` must be one this build can regenerate exactly (`SimulationRules.RegenerableGeneratorVersions`). Otherwise unsaved base state, such as coastlines and rivers, would come out differently, and the save is refused unless a migration is declared (spec §3.11).
