@@ -56,9 +56,13 @@ jobs:
         run: dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- validate-content
       - name: Check fixture determinism
         run: |
-          for fixture in F-EMPTY F-KERNEL; do
+          for fixture in F-EMPTY F-KERNEL F-ATLAS; do
             python tools/ci/check_determinism.py --write "artifacts/determinism/$fixture/${{ matrix.os }}.json" -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture "$fixture"
           done
+      # SOV-P03-T16: the atlas benchmark runs as a smoke check; numbers are recorded, never asserted.
+      - name: Atlas benchmark smoke
+        if: matrix.os == 'ubuntu-24.04'
+        run: mkdir -p artifacts && dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- bench --samples 5000 | tee artifacts/bench.json
       - name: Upload test results and failure reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

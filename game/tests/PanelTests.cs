@@ -38,25 +38,29 @@ public static class PanelTests
         // F-EMPTY starts 1 Mar 1203 06:00; the point is on the standard meridian, so local solar time equals standard time.
         var latitude = text.IndexOf("  latitude: 47.9497°");
         Check.True(latitude >= 0, $"latitude shows degrees with four decimals:\n{string.Join('\n', text)}");
-        Check.Equal("      basis: derived", text[latitude + 1], "latitude basis");
-        Check.Equal("      owner: World foundation", text[latitude + 2], "latitude owner");
-        Check.Equal("      source: geographic reference: south-edge latitude", text[latitude + 3], "latitude source");
-        Check.Contains(text[latitude + 4], "derivation: φ = φ₀ + y", "latitude derivation");
-        Check.Equal("      updated: 1 Mar 1203, 06:00:00", text[latitude + 5], "latitude was last derived from the start");
+        Check.Equal("      level: regional (256 m)", text[latitude + 1], "latitude level");
+        Check.Contains(text[latitude + 2], "classification: analytic: φ = φ₀ + y", "latitude classification");
+        Check.Equal("      basis: derived", text[latitude + 3], "latitude basis");
+        Check.Equal("      owner: World foundation", text[latitude + 4], "latitude owner");
+        Check.Equal("      source: geographic reference: south-edge latitude", text[latitude + 5], "latitude source");
+        Check.Equal("      updated: 1 Mar 1203, 06:00:00", text[latitude + 6], "latitude was last derived from the start");
+        Check.Equal("      inputs: none (computed from position and time)", text[latitude + 7], "an analytic reading has no grid inputs");
 
         var solar = text.IndexOf("  local mean solar time: 07:00:00");
         Check.True(solar >= 0, "solar time shows hh:mm:ss");
-        Check.Equal("      basis: derived", text[solar + 1], "solar time basis");
-        Check.Equal("      owner: Simulation scheduler", text[solar + 2], "solar time owner");
-        Check.Contains(text[solar + 3], "source: world clock", "solar time source");
-        Check.Contains(text[solar + 4], "derivation: standard time", "solar time derivation");
-        Check.Equal("      updated: 1 Mar 1203, 07:00:00", text[solar + 5], "solar time updated at the queried time");
+        Check.Equal("      level: regional (256 m)", text[solar + 1], "solar time level");
+        Check.Contains(text[solar + 2], "classification: analytic: standard time", "solar time classification");
+        Check.Equal("      basis: derived", text[solar + 3], "solar time basis");
+        Check.Equal("      owner: Simulation scheduler", text[solar + 4], "solar time owner");
+        Check.Equal("      source: world clock; geographic reference: standard meridian", text[solar + 5], "solar time source");
+        Check.Equal("      updated: 1 Mar 1203, 07:00:00", text[solar + 6], "solar time updated at the queried time");
 
         var easting = text.IndexOf("  easting x: 50000 m");
         Check.True(easting >= 0 && text[easting + 1] == "      basis: query" && text[easting + 2] == "      source: inspected position", "a queried coordinate states its basis and source");
         Check.True(!text[easting + 3].Contains("owner", StringComparison.Ordinal), "a reading without an owner shows no owner line");
         Check.True(text.Contains("  world seed: 20261009") && text.Any(line => line.StartsWith("  world extent: 100000 x 100000 m", StringComparison.Ordinal)), "seed and extent come from the inspection");
 
+        Check.True(text.IndexOf("Developer tools (available)") is >= 0 and var developer && developer < text.IndexOf("Bedrock and landform (unavailable)"), "families with data come before unavailable ones, even the last in the catalogue");
         var elevation = lines.Single(line => line.Text.StartsWith("  elevation above datum:", StringComparison.Ordinal));
         Check.True(elevation.Style == LineStyle.Dim && elevation.Text.Contains("Phase 04", StringComparison.Ordinal), "an unavailable reading is grey and names its phase");
 

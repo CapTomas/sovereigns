@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using Sovereigns.Simulation.Atlas;
 using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Content;
 using Sovereigns.Simulation.Diagnostics;
@@ -36,7 +37,7 @@ public sealed class World : ILogContext
     public const string KernelOwner = "kernel";
     public const string DeveloperOwner = "developer";
 
-    private const int ChecksumFormat = 3;
+    private const int ChecksumFormat = 4;
     private const double MarkerCellM = 1_000;
 
     private readonly Scheduler _scheduler = new();
@@ -47,6 +48,7 @@ public sealed class World : ILogContext
     private readonly StateVersion _markerVersion = new("markers");
     private readonly DerivedCache<ILookup<(long, long), DebugMarker>> _markerIndex;
     private readonly SubsystemLog _log;
+    private readonly FeatureStore _features = new();
     private SimCommand? _inFlight;
 
     private World(WorldIdentity identity, Logger logger)
@@ -60,6 +62,9 @@ public sealed class World : ILogContext
         }
 
         Ownership.Register("markers", DeveloperOwner);
+        Ownership.Register("field:" + FieldCatalog.Scratch.Key, DeveloperOwner);
+        Ownership.Register("features", DeveloperOwner);
+        Atlas = new FieldAtlas(this);
         _markerIndex = new DerivedCache<ILookup<(long, long), DebugMarker>>(
             () => _markers.ToLookup(marker => Cell(marker.Position)), _markerVersion);
         _scheduler.Register(new CalendarSystem(), identity.StepMs, Ownership);
@@ -93,6 +98,15 @@ public sealed class World : ILogContext
     public IReadOnlyList<ISimulationSystem> Systems => _scheduler.Systems;
 
     public IReadOnlyList<DebugMarker> Markers => _markers;
+
+    /// <summary>The world's queryable physical-field atlas (ADR-0009).</summary>
+    public FieldAtlas Atlas { get; }
+
+    /// <summary>Linear features with durable identities, in creation order.</summary>
+    public IReadOnlyList<MapFeature> Features => _features.Features;
+
+    /// <summary>Recomputations of the feature spatial index; shows it is rebuilt only after features change.</summary>
+    public int FeatureIndexComputations => _features.IndexComputations;
 
     public IReadOnlyCollection<Breakpoint> Breakpoints => _breakpoints;
 
@@ -146,6 +160,7 @@ public sealed class World : ILogContext
     /// <summary>Rebuilds a world from saved parts; <see cref="Persistence.SaveFile"/> validates them first.</summary>
     internal static World Restore(WorldIdentity identity, SimTime now, long commandsApplied, IReadOnlyDictionary<string, ulong> counters,
         IEnumerable<DebugMarker> markers, IEnumerable<Breakpoint> breakpoints, IEnumerable<PendingDecision> decisions,
+        IEnumerable<(string Field, GridCell Cell, CellOverride Override)> overrides, IEnumerable<MapFeature> features,
         IEnumerable<WorldEvent> ledger, string saveSha256, Logger? logger)
     {
         var world = new World(identity, logger ?? Logger.None) { Now = now, BaseSaveSha256 = saveSha256 };
@@ -159,6 +174,12 @@ public sealed class World : ILogContext
         }
 
         world._decisions.AddRange(decisions);
+        foreach (var (field, cell, value) in overrides)
+        {
+            world.Atlas.RestoreOverride(field, cell, value);
+        }
+
+        world._features.Restore(features);
         world.Ledger.Restore(ledger);
         world._log.Info("world loaded", data: new Dictionary<string, string> { ["world_id"] = identity.Id.ToString() });
         return world;
@@ -292,25 +313,56 @@ public sealed class World : ILogContext
         return true;
     }
 
+    /// <summary>Why a survey line is invalid, or null; shared by the command and by save validation.</summary>
+    internal static string? SurveyLineProblem(IReadOnlyList<WorldPoint>? points, string? label, WorldExtent extent)
+    {
+        if (points is null || points.Count < 2 || points.Count > DrawSurveyLine.MaxPoints ||
+            points.Any(point => !point.IsFinite || !extent.Contains(point)) ||
+            points.Zip(points.Skip(1)).Any(pair => pair.First == pair.Second))
+        {
+            return $"a survey line needs 2 to {DrawSurveyLine.MaxPoints} distinct consecutive points inside the world";
+        }
+
+        return label is null || label.Length > PlaceMarker.MaxLabelLength || label.Any(char.IsControl)
+            ? $"survey line label must be at most {PlaceMarker.MaxLabelLength} characters without control characters"
+            : null;
+    }
+
     /// <summary>
-    /// Reports what the simulation knows at a position now, with provenance for every reading. It reads state and
-    /// never changes it, whatever the host's view or residency (ADR-0007).
+    /// Reports what the simulation knows at a position now, with provenance for every reading: each field of every
+    /// family sampled at <paramref name="level"/> (each field's native level by default), plus nearby markers and
+    /// features. It reads state and never changes it, whatever the host's view or residency (ADR-0007, ADR-0009).
     /// </summary>
-    public LocationInspection Inspect(WorldPoint point, double markerRadiusM = 0)
+    public LocationInspection Inspect(WorldPoint point, double markerRadiusM = 0, GridLevel? level = null)
     {
         var inside = point.IsFinite && Extent.Contains(point);
-        var families = FieldFamilies.All.Select(family => family == FieldFamilies.GeographicReference
-                ? new FamilyInspection(family, FieldAvailability.Partial, GeographicReadings(point, inside))
-                : new FamilyInspection(family, FieldAvailability.Unavailable,
-                    [FieldReading.Unavailable("all quantities", FieldFamilies.UnavailableReason(family))]))
-            .ToList();
-        return new LocationInspection(point, inside, Now, Seed, Extent, families, MarkersNear(point, markerRadiusM));
+        var families = FieldFamilies.All.Append(FieldCatalog.Developer).Select(family =>
+        {
+            var samples = FieldCatalog.InFamily(family).Select(field => Atlas.Sample(field.Key, point, level)).ToList();
+            var readings = samples.Select(Reading).ToList();
+            if (family == FieldFamilies.GeographicReference)
+            {
+                readings.InsertRange(0,
+                [
+                    new("easting x", point.X, "m", ReadingBasis.Query, Source: "inspected position"),
+                    new("northing y", point.Y, "m", ReadingBasis.Query, Source: "inspected position"),
+                ]);
+            }
+
+            var available = samples.Count(sample => Atlas.IsAvailable(sample.Field.Key));
+            var availability = available == 0 ? FieldAvailability.Unavailable
+                : available == samples.Count ? FieldAvailability.Available : FieldAvailability.Partial;
+            return new FamilyInspection(family, availability, readings);
+        }).ToList();
+        var radius = Math.Max(0, markerRadiusM);
+        IReadOnlyList<FeatureHit> features = inside ? _features.Near(point, radius) : [];
+        return new LocationInspection(point, inside, Now, Seed, Extent, families, MarkersNear(point, markerRadiusM), features);
     }
 
     /// <summary>
     /// SHA-256 over a canonical little-endian encoding of all authoritative state: identity except the world ID,
-    /// clock, number of world commands applied, ID counters, markers, breakpoints, pending decisions and the event
-    /// ledger. Equal checksums mean equal
+    /// clock, number of world commands applied, ID counters, markers, breakpoints, pending decisions, field overrides,
+    /// features and the event ledger. Caches and residency are never included. Equal checksums mean equal
     /// state; the encoding changes only with <c>ChecksumFormat</c>.
     /// </summary>
     public string ComputeChecksum()
@@ -384,6 +436,37 @@ public sealed class World : ILogContext
             Int64(decision.At.Milliseconds);
             Text(decision.Source);
             Text(decision.Label);
+        }
+
+        var overrides = Atlas.AllOverrides().ToList();
+        Int64(overrides.Count);
+        foreach (var (field, cell, value) in overrides)
+        {
+            Text(field);
+            Int64((long)cell.Level);
+            Int64(cell.I);
+            Int64(cell.J);
+            Int64(value.At.Milliseconds);
+            Int64(value.Values.Count);
+            foreach (var component in value.Values)
+            {
+                Double(component);
+            }
+        }
+
+        Int64(_features.Features.Count);
+        foreach (var feature in _features.Features)
+        {
+            Text(feature.Id);
+            Text(feature.Kind.ToString());
+            Text(feature.Label);
+            Int64(feature.CreatedAt.Milliseconds);
+            Int64(feature.Points.Count);
+            foreach (var point in feature.Points)
+            {
+                Double(point.X);
+                Double(point.Y);
+            }
         }
 
         Int64(Ledger.Count);
@@ -489,6 +572,52 @@ public sealed class World : ILogContext
                 _breakpoints.Add(new Breakpoint(id, set.At, set.Label, setEvent.Id));
                 return null;
 
+            case PaintScratch paint:
+                if (!paint.Centre.IsFinite || !Extent.Contains(paint.Centre))
+                {
+                    return $"paint centre {paint.Centre} is outside the world";
+                }
+
+                if (!(paint.RadiusM > 0) || paint.RadiusM > PaintScratch.MaxRadiusM || !(paint.Value is >= 0 and <= 1))
+                {
+                    return $"paint radius must be 0 < r <= {PaintScratch.MaxRadiusM} m and the value 0 to 1";
+                }
+
+                var cells = Atlas.Paint(FieldCatalog.Scratch.Key, paint.Centre, paint.RadiusM, paint.Value);
+                Record(WorldEventType.FieldPainted, cause, [], new Dictionary<string, string>
+                {
+                    ["field"] = FieldCatalog.Scratch.Key,
+                    ["centre"] = paint.Centre.ToString(),
+                    ["radius_m"] = paint.RadiusM.ToString("0.###", CultureInfo.InvariantCulture),
+                    ["value"] = paint.Value.ToString("0.###", CultureInfo.InvariantCulture),
+                    ["cells"] = cells.ToString(CultureInfo.InvariantCulture),
+                });
+                return null;
+
+            case DrawSurveyLine draw:
+                if (SurveyLineProblem(draw.Points, draw.Label, Extent) is { } problem)
+                {
+                    return problem;
+                }
+
+                var line = new MapFeature(Ids.Next<Kind.SurveyLine>().ToString(), FeatureKind.SurveyLine, [.. draw.Points], draw.Label, Now);
+                _features.Add(line);
+                Record(WorldEventType.FeatureDrawn, cause, [line.Id], new Dictionary<string, string>
+                {
+                    ["label"] = line.Label,
+                    ["points"] = line.Points.Count.ToString(CultureInfo.InvariantCulture),
+                });
+                return null;
+
+            case RemoveSurveyLine removeLine:
+                if (!_features.Remove(removeLine.Line.ToString()))
+                {
+                    return Ids.WasIssued(removeLine.Line) ? $"{removeLine.Line} was already removed" : $"{removeLine.Line} does not exist";
+                }
+
+                Record(WorldEventType.FeatureRemoved, cause, [removeLine.Line.ToString()]);
+                return null;
+
             case AcknowledgeDecision acknowledge:
                 var pending = _decisions.FindIndex(decision => decision.Event == acknowledge.Decision);
                 if (pending < 0)
@@ -523,27 +652,18 @@ public sealed class World : ILogContext
         }
     }
 
-    private IReadOnlyList<FieldReading> GeographicReadings(WorldPoint point, bool inside)
+    private FieldReading Reading(FieldSample sample)
     {
-        const string outside = "unavailable: the point is outside the world frame";
-        var geography = Identity.Geography;
-        var latitude = inside
-            ? new FieldReading("latitude", geography.LatitudeAt(point.Y), "rad", ReadingBasis.Derived, "World foundation",
-                "geographic reference: south-edge latitude", "φ = φ₀ + y / 6 371 000 m", Identity.Start)
-            : FieldReading.Unavailable("latitude", outside);
-        var solar = inside
-            ? new FieldReading("local mean solar time", geography.LocalSolarTimeOfDayMs(Now, point.X, Extent) / 1000.0, "s",
-                ReadingBasis.Derived, "Simulation scheduler", "world clock; geographic reference: standard meridian",
-                "standard time + (x − x_std) / (R cos φ_mid) · 86 400 s / 2π", Now)
-            : FieldReading.Unavailable("local mean solar time", outside);
-        return
-        [
-            new("easting x", point.X, "m", ReadingBasis.Query, Source: "inspected position"),
-            new("northing y", point.Y, "m", ReadingBasis.Query, Source: "inspected position"),
-            latitude,
-            solar,
-            FieldReading.Unavailable("elevation above datum", "unavailable: World foundation implements elevation in Phase 04"),
-        ];
+        var field = sample.Field;
+        return sample.Values is null
+            ? FieldReading.Unavailable(field.Name.ToLowerInvariant(), sample.UnavailableReason ?? "unavailable")
+            : new FieldReading(field.Name.ToLowerInvariant(), sample.Value, field.Unit, sample.Basis, field.Owner,
+                Atlas.SourceOf(field.Key), sample.Classification, sample.ChangedAt)
+            {
+                Level = sample.Level,
+                Components = field.Kind == FieldKind.Vector ? sample.Values : null,
+                Inputs = sample.Inputs,
+            };
     }
 
     private List<DebugMarker> MarkersNear(WorldPoint point, double radiusM)

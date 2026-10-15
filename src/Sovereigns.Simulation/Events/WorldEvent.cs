@@ -15,6 +15,9 @@ public enum WorldEventType
     DecisionAcknowledged,
     SeasonBegan,
     YearBegan,
+    FieldPainted,
+    FeatureDrawn,
+    FeatureRemoved,
 }
 
 public enum CauseKind

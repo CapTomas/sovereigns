@@ -1,6 +1,6 @@
 # Reference fixtures
 
-Versioned manifests for the reference worlds defined in [the original delivery rules](../../docs/process/ORIGINAL_DELIVERY_RULES.md#a4-reference-worlds-and-cumulative-demonstrations), plus `F-EMPTY`, the seeded empty world, and `F-KERNEL`, a 400-day kernel timeline with a command journal. The reference worlds stay **blank** until the simulation can produce them: no seed, scenario or world content exists, and a blank fixture asserts nothing about gameplay.
+Versioned manifests for the reference worlds defined in [the original delivery rules](../../docs/process/ORIGINAL_DELIVERY_RULES.md#a4-reference-worlds-and-cumulative-demonstrations), plus `F-EMPTY`, the seeded empty world, `F-KERNEL`, a 400-day kernel timeline with a command journal, and `F-ATLAS`, developer scratch paint and survey lines that exercise the field atlas (Phase 03). The reference worlds stay **blank** until the simulation can produce them: no seed, scenario or world content exists, and a blank fixture asserts nothing about gameplay.
 
 Run a defined fixture by ID, headless or in the inspection shell:
 

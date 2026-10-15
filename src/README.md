@@ -14,10 +14,11 @@ All authoritative world, economy, political and combat logic belongs here, in or
 | `Ids/` | Typed `EntityId<TKind>` and the per-kind `IdAllocator` |
 | `Random/` | Counter-based `RandomStream`, keyed by seed, purpose, place and identity |
 | `State/` | `OwnershipRegistry`, `StateVersion` and `DerivedCache` (single writer, version-stamped invalidation) |
-| `Persistence/` | `SaveFile`: versioned, hashed, reference-validated saves |
+| `Atlas/` | The field atlas ([ADR-0009](../docs/architecture/ADR-0009-field-atlas.md)): grid levels and chunks, the field catalogue, sampling at any level, aggregation, refinement, chunk cache and invalidation, linear features |
+| `Persistence/` | `SaveFile`: versioned, hashed, reference-validated saves with declared migrations |
 | `Geometry/`, `Markers/`, `Fields/` | World frame types, developer markers, field-family availability and readings |
 | `Commands/` | Command types, the `CommandJournal` and `Replay` |
 | `Diagnostics/` | Structured `Logger`, sinks and `FailureReport` |
 | `Content/`, `Scenarios/` | Content IDs, validated content loading, scenarios, fixtures and launch selection |
 
-A new subsystem registers an `ISimulationSystem` with a priority from ADR-0007, owns its components, records ledger events with causes, draws from keyed random streams, returns readings with provenance, and adds its state to saves under ADR-0008. Simulation code never reads wall-clock time, `System.Random`, `Guid.NewGuid` or `string.GetHashCode`; the banned-API analyzer turns any use into a build error.
+A new subsystem registers an `ISimulationSystem` with a priority from ADR-0007, registers its fields with the atlas under the catalogue contract (ADR-0009), owns its components, records ledger events with causes, draws from keyed random streams, returns readings with provenance, and adds its state to saves under ADR-0008. Simulation code never reads wall-clock time, `System.Random`, `Guid.NewGuid` or `string.GetHashCode`; the banned-API analyzer turns any use into a build error.

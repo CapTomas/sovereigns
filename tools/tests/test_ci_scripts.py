@@ -44,12 +44,12 @@ class RunChecked(unittest.TestCase):
         self.assertEqual(self.run_main('--','definitely-not-a-program-987')[0],1)
 
 class Determinism(unittest.TestCase):
-    SUMMARY={'checksum':'abc','sim_time_ms':10,'steps':10,'wall_ms':1.5}
+    SUMMARY={'checksum':'abc','sim_time_ms':10,'steps':10,'atlas_probe':'p','wall_ms':1.5}
 
     def test_only_compared_fields_matter(self):
         self.assertEqual(check_determinism.differences(self.SUMMARY,{**self.SUMMARY,'wall_ms':9.9}),[])
         self.assertEqual(len(check_determinism.differences(self.SUMMARY,{**self.SUMMARY,'checksum':'def'})),1)
-        self.assertEqual(len(check_determinism.differences(self.SUMMARY,{'checksum':'abc'})),2)
+        self.assertEqual(len(check_determinism.differences(self.SUMMARY,{'checksum':'abc'})),3)
 
     def test_summary_is_the_last_json_line(self):
         self.assertEqual(check_determinism.summary_of('noise\n'+json.dumps(self.SUMMARY)+'\n'),self.SUMMARY)
@@ -85,12 +85,22 @@ class Determinism(unittest.TestCase):
             code=f'import json; print(json.dumps({self.SUMMARY!r}))'
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(check_determinism.main(['--write',str(out),'--',*python(code)]),0)
-            self.assertEqual(json.loads(out.read_text(encoding='utf-8')),{'checksum':'abc','sim_time_ms':10,'steps':10})
+            self.assertEqual(json.loads(out.read_text(encoding='utf-8')),{'checksum':'abc','sim_time_ms':10,'steps':10,'atlas_probe':'p'})
 
     def test_stable_command_passes_and_drifting_or_failing_command_fails(self):
         self.assertEqual(self.run_main('import json; print(json.dumps({"checksum":"a","sim_time_ms":1,"steps":1,"wall_ms":2}))'),0)
         self.assertEqual(self.run_main('import json,random; print(json.dumps({"checksum":random.random(),"sim_time_ms":1,"steps":1}))'),1)
         self.assertEqual(self.run_main('import sys; sys.exit(1)'),1)
+
+    def test_atlas_probe_is_compared_when_reported_and_optional_for_older_builds(self):
+        drifting='import json,random; print(json.dumps({"checksum":"a","sim_time_ms":1,"steps":1,"atlas_probe":str(random.random())}))'
+        self.assertEqual(self.run_main(drifting),1)
+        with tempfile.TemporaryDirectory() as directory:
+            out=Path(directory)/'os.json'
+            code='import json; print(json.dumps({"checksum":"a","sim_time_ms":1,"steps":1}))'
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(check_determinism.main(['--write',str(out),'--',*python(code)]),0)
+            self.assertEqual(json.loads(out.read_text(encoding='utf-8')),{'checksum':'a','sim_time_ms':1,'steps':1})
 
 class Notices(unittest.TestCase):
     def test_registry_renders_shipped_items_only(self):

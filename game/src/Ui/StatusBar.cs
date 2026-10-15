@@ -1,15 +1,22 @@
 namespace Sovereigns.Client.Ui;
 
-/// <summary>Bottom bar: a transient status message above the help line listing the current bindings.</summary>
+/// <summary>Bottom bar: a transient status message, the developer-tool and view-level state, and the help line listing the current bindings.</summary>
 public partial class StatusBar : PanelContainer
 {
     private const ulong StatusMilliseconds = 8000;
 
     private Label _status = null!;
+    private Label _tools = null!;
     private Label _help = null!;
     private ulong _clearAt;
 
     public string HelpText => _help.Text;
+
+    /// <summary>The current status message; empty once it has timed out.</summary>
+    public string StatusText => _status.Text;
+
+    /// <summary>Paint brush, pending survey line and view level, which stay visible while status messages come and go.</summary>
+    public string ToolsText => _tools.Text;
 
     public override void _Ready()
     {
@@ -18,6 +25,8 @@ public partial class StatusBar : PanelContainer
         AddChild(column);
         _status = UiStyle.MakeLabel(wrap: true);
         column.AddChild(_status);
+        _tools = UiStyle.MakeLabel(12, UiStyle.Heading, wrap: true);
+        column.AddChild(_tools);
         _help = UiStyle.MakeLabel(12, UiStyle.Dim, wrap: true);
         column.AddChild(_help);
     }
@@ -32,6 +41,8 @@ public partial class StatusBar : PanelContainer
     }
 
     public void SetHelp(string text) => _help.Text = text;
+
+    public void SetTools(string text) => _tools.Text = text;
 
     public void ShowStatus(string text, LineStyle style = LineStyle.Normal)
     {

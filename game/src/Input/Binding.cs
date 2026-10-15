@@ -53,6 +53,8 @@ public readonly record struct Binding(BindingKind Kind, Key Key, MouseButton But
         [Key.Equal] = "=",
         [Key.Minus] = "-",
         [Key.Period] = ".",
+        [Key.Pageup] = "PgUp",
+        [Key.Pagedown] = "PgDn",
         [Key.Key1] = "1",
         [Key.Key2] = "2",
         [Key.Key3] = "3",

@@ -12,12 +12,12 @@ public enum FieldAvailability
 }
 
 /// <summary>
-/// One spec §3.2 world data family, its authoritative writer from the system map, and the phase
-/// that first implements it. SOV-P03-T02 replaces this availability list with full field contracts.
+/// One spec §3.2 world data family, its authoritative writer from the system map, and the phase that first implements
+/// it. The family's fields and their contracts are in <see cref="Atlas.FieldCatalog"/> (ADR-0009).
 /// </summary>
 public sealed record FieldFamily(string Key, string Name, string Owner, string FirstImplementedBy);
 
-/// <summary>What this build can report about the spec §3.2 field families.</summary>
+/// <summary>The spec §3.2 world data families, in spec order.</summary>
 public static class FieldFamilies
 {
     public static readonly FieldFamily GeographicReference =
@@ -42,13 +42,4 @@ public static class FieldFamilies
         new("human_landscape", "Human landscape", "Economy/population; Politics/government; Infrastructure", "Phase 15"),
         new("transient_local", "Transient local conditions", "Hydrology; Ecology/soil; Tactical warfare", "Phase 09"),
     ];
-
-    public static FieldAvailability AvailabilityOf(FieldFamily family) =>
-        family == GeographicReference ? FieldAvailability.Partial : FieldAvailability.Unavailable;
-
-    public static string UnavailableReason(FieldFamily family)
-    {
-        ArgumentNullException.ThrowIfNull(family);
-        return $"unavailable: {family.Owner} implements this family in {family.FirstImplementedBy}";
-    }
 }

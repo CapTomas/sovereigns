@@ -48,10 +48,10 @@ public partial class InspectorPanel : PanelContainer
         Render();
     }
 
-    public void Show(LocationInspection inspection, double markerRadiusM)
+    public void Show(LocationInspection inspection, double markerRadiusM, string? levelNote = null, FieldFamily? focus = null)
     {
         Current = inspection;
-        Lines = InspectorContent.Build(inspection, markerRadiusM);
+        Lines = InspectorContent.Build(inspection, markerRadiusM, levelNote, focus);
         _time.Text = $"Queried at {ClockText.Date(inspection.At)} (world standard time)";
         Render();
     }
@@ -66,6 +66,7 @@ public partial class InspectorPanel : PanelContainer
         }
 
         _signature = signature;
+        var scroll = _body.GetVScrollBar().Value;
         _body.Clear();
         foreach (var line in Lines)
         {
@@ -73,6 +74,12 @@ public partial class InspectorPanel : PanelContainer
             _body.AddText(line.Text);
             _body.Pop();
             _body.Newline();
+        }
+
+        // The clock changes a reading every second; keep the player's place in the list instead of jumping to the top.
+        if (scroll > 0)
+        {
+            Callable.From(() => _body.GetVScrollBar().Value = scroll).CallDeferred();
         }
     }
 }

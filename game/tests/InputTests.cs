@@ -32,6 +32,14 @@ public static class InputTests
         Check.True(!InputMap.EventIsAction(new InputEventKey { Keycode = Key.Q, Pressed = true }, InputActions.Quit, exactMatch: true), "plain Q does not quit");
         Check.True(!InputMap.EventIsAction(new InputEventKey { Keycode = Key.M, CtrlPressed = true, Pressed = true }, InputActions.PlaceMarker, exactMatch: true), "Ctrl+M is not place_marker");
         Check.Equal(0, bindings.FindConflicts().Count, "default bindings have no conflicts");
+
+        // Paint radius shares its key with zoom, told apart by Shift: exact matching keeps each event to one action.
+        var shiftEqual = new InputEventKey { Keycode = Key.Equal, ShiftPressed = true, Pressed = true };
+        Check.True(InputMap.EventIsAction(shiftEqual, InputActions.PaintRadiusUp, exactMatch: true), "Shift+= raises the paint radius");
+        Check.True(!InputMap.EventIsAction(shiftEqual, InputActions.CameraZoomIn, exactMatch: true), "Shift+= does not zoom");
+        Check.True(!InputMap.EventIsAction(new InputEventKey { Keycode = Key.Equal, Pressed = true }, InputActions.PaintRadiusUp, exactMatch: true), "plain = does not change the radius");
+        Check.True(InputMap.EventIsAction(new InputEventKey { Keycode = Key.P, Pressed = true }, InputActions.PaintScratch, exactMatch: true), "P paints");
+        Check.True(InputMap.EventIsAction(new InputEventKey { Keycode = Key.Pagedown, Pressed = true }, InputActions.LevelFiner, exactMatch: true), "Page Down selects the next finer level");
         return Task.CompletedTask;
     }
 
@@ -139,6 +147,9 @@ public static class InputTests
     {
         var bindings = InputBindings.Defaults();
         Check.Contains(HelpText.Build(bindings), "Place marker: M", "default help");
+        Check.Contains(HelpText.Build(bindings), "Paint: P", "the paint tool is in the help line");
+        Check.Contains(HelpText.Build(bindings), "Survey add/finish/cancel/remove: L/K/J/X", "the survey tools are in the help line");
+        Check.Contains(HelpText.Build(bindings), "Level coarser/finer: PgUp/PgDn", "the level keys are in the help line");
         bindings.Rebind(InputActions.PlaceMarker, ["key:P"]);
         var help = HelpText.Build(bindings);
         Check.Contains(help, "Place marker: P", "rebound help");

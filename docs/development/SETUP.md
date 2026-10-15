@@ -54,10 +54,12 @@ dotnet format Sovereigns.slnx --verify-no-changes --no-restore
 dotnet build Sovereigns.slnx -c Release --no-restore
 dotnet test Sovereigns.slnx -c Release --no-build --logger trx --results-directory artifacts/test-results
 dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- validate-content
-for fixture in F-EMPTY F-KERNEL; do python3 tools/ci/check_determinism.py -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture "$fixture"; done
+for fixture in F-EMPTY F-KERNEL F-ATLAS; do python3 tools/ci/check_determinism.py -- dotnet run --project tools/Sovereigns.Headless -c Release --no-build -- run --fixture "$fixture"; done
 ```
 
-The last command runs each fixture twice and fails if the checksum, simulated time or step count differ. `F-KERNEL` covers 400 days of calendar, command and decision history. In CI each operating system also saves its result with `--write` under `artifacts/determinism/<fixture>/`. The `determinism` job then compares the three operating systems per fixture with `check_determinism.py --compare`, which is the cross-platform measurement ADR-0004 §3 asks for. To fix a formatting failure run `dotnet format Sovereigns.slnx` (without `--verify-no-changes`).
+For atlas performance on this machine, run `dotnet run --project tools/Sovereigns.Headless -c Release -- bench`. It prints measurements without thresholds; compare runs on the same hardware (QUALITY_BAR). CI runs a small bench on Linux as a smoke check.
+
+The last command runs each fixture twice and fails if the checksum, simulated time, step count or atlas probe differ. `F-KERNEL` covers 400 days of calendar, command and decision history; `F-ATLAS` paints the scratch field and draws survey lines, and its atlas probe digests sampled latitude, scratch and gradient values at every level, so derived atlas values are compared too. In CI each operating system also saves its result with `--write` under `artifacts/determinism/<fixture>/`. The `determinism` job then compares the three operating systems per fixture with `check_determinism.py --compare`, which is the cross-platform measurement ADR-0004 §3 asks for. To fix a formatting failure run `dotnet format Sovereigns.slnx` (without `--verify-no-changes`).
 
 ### Repository documentation checks (the `docs` check)
 

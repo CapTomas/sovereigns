@@ -109,16 +109,16 @@ public sealed class WorldTests
 
         Assert.True(inspection.InsideWorld);
         Assert.Equal((world.Now, 42UL, world.Extent), (inspection.At, inspection.WorldSeed, inspection.WorldExtent));
-        Assert.Equal(FieldFamilies.All.Select(family => family.Key), inspection.Families.Select(family => family.Family.Key));
+        Assert.Equal(FieldFamilies.All.Append(Atlas.FieldCatalog.Developer).Select(family => family.Key), inspection.Families.Select(family => family.Family.Key));
         var unavailable = inspection.Families.Where(family => family.Availability == FieldAvailability.Unavailable).ToList();
         Assert.Equal(15, unavailable.Count);
-        Assert.All(unavailable, family =>
+        Assert.All(unavailable.SelectMany(family => family.Readings), reading =>
         {
-            var reading = Assert.Single(family.Readings);
             Assert.Equal(ReadingBasis.Unavailable, reading.Basis);
             Assert.Null(reading.Value);
-            Assert.Contains(family.Family.FirstImplementedBy, reading.UnavailableReason, StringComparison.Ordinal);
+            Assert.Matches("implements .+ in Phase \\d\\d", reading.UnavailableReason!);
         });
+        Assert.Equal(FieldAvailability.Available, inspection.Families[0].Availability);
 
         var readings = inspection.Families[0].Readings.ToDictionary(reading => reading.Quantity);
         Assert.Equal((510.0, "m", ReadingBasis.Query), (readings["easting x"].Value, readings["easting x"].Unit, readings["easting x"].Basis));
@@ -129,7 +129,8 @@ public sealed class WorldTests
         Assert.Equal("World foundation", latitude.Owner);
         Assert.NotNull(latitude.Derivation);
         Assert.Equal(world.Now, readings["local mean solar time"].UpdatedAt);
-        Assert.Equal(ReadingBasis.Unavailable, readings["elevation above datum"].Basis);
+        var elevation = inspection.Families.Single(family => family.Family.Key == "bedrock_landform").Readings[0];
+        Assert.Equal(("elevation above datum", ReadingBasis.Unavailable), (elevation.Quantity, elevation.Basis));
         Assert.Equal("near", Assert.Single(inspection.NearbyMarkers).Label);
     }
 

@@ -30,7 +30,7 @@ public static class Kind
     public static IReadOnlyList<string> Names { get; } =
     [
         NaturalFeature.Name, Settlement.Name, Facility.Name, Army.Name, Regiment.Name, Polity.Name,
-        TacticalObject.Name, Event.Name, Marker.Name, Breakpoint.Name,
+        TacticalObject.Name, Event.Name, Marker.Name, Breakpoint.Name, SurveyLine.Name,
     ];
 
     public sealed class NaturalFeature : IEntityKind
@@ -84,6 +84,12 @@ public static class Kind
     public sealed class Breakpoint : IEntityKind
     {
         public static string Name => "breakpoint";
+    }
+
+    /// <summary>Developer survey lines: linear features for exercising feature geometry.</summary>
+    public sealed class SurveyLine : IEntityKind
+    {
+        public static string Name => "survey";
     }
 }
 

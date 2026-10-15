@@ -20,6 +20,7 @@ The Python scripts require Python 3.11+, use only its standard library and run o
 | Run a fixture or scenario headless; print the state checksum | `dotnet run --project tools/Sovereigns.Headless -- run --fixture F-EMPTY` |
 | Reproduce a failure report | `dotnet run --project tools/Sovereigns.Headless -- replay <report.json> [--save <save.json>]` |
 | Save at the end of a run; continue from a save | `... run --fixture F-KERNEL --for-ms 8640000000 --save day100.json`, then `... run --load day100.json --for-ms <ms>` |
+| Measure atlas queries, chunk churn, aggregation and memory (JSON, no thresholds) | `dotnet run --project tools/Sovereigns.Headless -c Release -- bench [--samples 100000]` |
 | Validate content definitions | `dotnet run --project tools/Sovereigns.Headless -- validate-content` |
 | Reference random-stream values (ADR-0007) | `python3 tools/random_stream_reference.py <seed> <purpose> [key ...]` |
 | CI helpers (Godot install, checked runs, determinism, notices) | `tools/ci/` — see [SETUP](../docs/development/SETUP.md) |

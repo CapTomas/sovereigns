@@ -1,4 +1,6 @@
 using Sovereigns.Client.Boot;
+using Sovereigns.Simulation.Atlas;
+using Sovereigns.Simulation.Commands;
 using Sovereigns.Simulation.Geometry;
 using Sovereigns.Simulation.Scenarios;
 
@@ -26,7 +28,18 @@ public static class LaunchTests
         Check.Equal(30, args.CaptureFrame, "capture frame");
         Check.Equal(10, LaunchArguments.Parse([]).CaptureFrame, "default capture frame");
 
-        foreach (var bad in new[] { new[] { "--bogus", "1" }, ["--fixture"], ["--seed", "1", "--seed", "2"], ["--select", "5"], ["--fail-after-ms", "-1"], ["--fail-at-ms", "1"], ["fixture", "F-EMPTY"], ["--speed", "0"], ["--speed", "6"], ["--speed", "fast"], ["--paused", "--paused"] })
+        var atlas = LaunchArguments.Parse(["--paint", "50000,50000,600,1;51000,50000,200,0.25", "--line", "1000,2000;3000,4000;5000,3000|10,10;20,20", "--center", "50000,50500", "--zoom", "2.5", "--level", "Local", "--residency", "--no-hud"]);
+        Check.Equal(2, atlas.Paint.Count, "two paint strokes");
+        Check.Equal(new PaintScratch(new WorldPoint(51_000, 50_000), 200, 0.25), atlas.Paint[1], "second stroke");
+        Check.Equal(2, atlas.Lines.Count, "two survey lines");
+        Check.Equal(3, atlas.Lines[0].Count, "first line has three points");
+        Check.Equal(new WorldPoint(50_000, 50_500), atlas.Center, "center");
+        Check.Equal(2.5, atlas.MetresPerPixel, "zoom in metres per pixel");
+        Check.Equal(GridLevel.Local, atlas.Level, "level by name, case-insensitive");
+        Check.True(atlas.Residency && atlas.HideHud, "--residency and --no-hud are flags");
+        Check.True(LaunchArguments.Parse([]) is { Paint.Count: 0, Lines.Count: 0, Center: null, MetresPerPixel: null, Level: null, Residency: false, HideHud: false }, "atlas options are off by default");
+
+        foreach (var bad in new[] { new[] { "--bogus", "1" }, ["--fixture"], ["--seed", "1", "--seed", "2"], ["--select", "5"], ["--fail-after-ms", "-1"], ["--fail-at-ms", "1"], ["fixture", "F-EMPTY"], ["--speed", "0"], ["--speed", "6"], ["--speed", "fast"], ["--paused", "--paused"], ["--paint", "1,2,3"], ["--paint", "1,2,6000,1"], ["--paint", "1,2,3,2"], ["--paint", "1,2,0,1"], ["--line", "1,2"], ["--line", "1,2;3"], ["--zoom", "0"], ["--zoom", "near"], ["--level", "fine"], ["--level", "1"], ["--center", "1"] })
         {
             var message = ExpectLaunchException(() => LaunchArguments.Parse(bad), $"arguments {string.Join(' ', bad)}");
             Check.True(message.Length > 0, "the message says what is wrong");

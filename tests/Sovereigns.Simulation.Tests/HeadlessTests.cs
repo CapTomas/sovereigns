@@ -220,6 +220,36 @@ public sealed class HeadlessTests
         JsonDocument.Parse(Run("run", "--fixture", fixture, "--for-ms", "0").Out).RootElement.GetProperty("sim_time_ms").GetInt64();
 
     [Fact]
+    public void TheAtlasProbeRepeatsAndSeesPaintedFields()
+    {
+        // SOV-P03-T04: the cross-OS determinism job compares this digest, so it must depend on the atlas's contents.
+        static string Probe(string fixture)
+        {
+            using var summary = JsonDocument.Parse(Run("run", "--fixture", fixture).Out);
+            return summary.RootElement.GetProperty("atlas_probe").GetString()!;
+        }
+
+        var painted = Probe("F-ATLAS");
+
+        Assert.Equal(painted, Probe("F-ATLAS"));
+        Assert.NotEqual(painted, Probe("F-EMPTY"));
+    }
+
+    [Fact]
+    public void BenchMeasuresEveryAtlasCaseAndPrintsJson()
+    {
+        var bench = Run("bench", "--samples", "200");
+
+        Assert.Equal(HeadlessApp.Ok, bench.Code);
+        using var summary = JsonDocument.Parse(bench.Out);
+        var cases = summary.RootElement.GetProperty("cases").EnumerateArray().ToList();
+        Assert.Equal(7, cases.Count);
+        Assert.All(cases, item => Assert.True(item.GetProperty("samples_per_second").GetDouble() > 0));
+        Assert.Equal(39_062_500, summary.RootElement.GetProperty("whole_world_aggregate").GetProperty("cells").GetInt64());
+        Assert.True(summary.RootElement.GetProperty("stored_overrides").GetInt32() > 0);
+    }
+
+    [Fact]
     public void ValidateContentAcceptsTheRepositoryContent()
     {
         var result = Run("validate-content");
